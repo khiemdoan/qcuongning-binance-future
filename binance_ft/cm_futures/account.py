@@ -1,5 +1,5 @@
-from binance.lib.utils import check_required_parameter
-from binance.lib.utils import check_required_parameters
+from binance_ft.lib.utils import check_required_parameter
+from binance_ft.lib.utils import check_required_parameters
 
 
 def change_position_mode(self, dualSidePosition: str, **kwargs):

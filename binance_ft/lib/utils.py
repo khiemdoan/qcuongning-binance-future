@@ -2,7 +2,7 @@ import json
 import time
 
 from urllib.parse import urlencode, urlparse
-from binance.error import (
+from binance_ft.error import (
     ParameterRequiredError,
     ParameterValueError,
     ParameterTypeError,

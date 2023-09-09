@@ -1,7 +1,7 @@
 import logging
-from binance.um_futures import UMFutures
-from binance.lib.utils import config_logging
-from binance.error import ClientError
+from binance_ft.um_futures import UMFutures
+from binance_ft.lib.utils import config_logging
+from binance_ft.error import ClientError
 
 config_logging(logging, logging.DEBUG)
 

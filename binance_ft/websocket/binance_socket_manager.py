@@ -8,7 +8,7 @@ from websocket import (
     WebSocketException,
     WebSocketConnectionClosedException,
 )
-from binance.lib.utils import parse_proxies
+from binance_ft.lib.utils import parse_proxies
 
 
 class BinanceSocketManager(threading.Thread):

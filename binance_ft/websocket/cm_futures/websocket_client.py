@@ -1,12 +1,12 @@
 from typing import Optional
 
-from binance.websocket.websocket_client import BinanceWebsocketClient
+from binance_ft.websocket.websocket_client import BinanceWebsocketClient
 
 
-class UMFuturesWebsocketClient(BinanceWebsocketClient):
+class CMFuturesWebsocketClient(BinanceWebsocketClient):
     def __init__(
         self,
-        stream_url="wss://fstream.binance.com",
+        stream_url="wss://dstream.binance.com",
         on_message=None,
         on_open=None,
         on_close=None,
@@ -39,7 +39,7 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         Stream Name: <symbol>@aggTrade
 
-        https://binance-docs.github.io/apidocs/futures/en/#aggregate-trade-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#aggregate-trade-streams
 
         Update Speed: 100ms
         """
@@ -47,18 +47,51 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         self.send_message_to_server(stream_name, action=action, id=id)
 
-    def mark_price(self, symbol: str, speed: int, id=None, action=None, **kwargs):
+    def index_price(self, pair: str, id=None, speed=1, action=None, **kwargs):
+        """Index Price Streams
+
+        Stream Name: <pair>@indexPrice OR <pair>@indexPrice@1s
+
+        https://binance-docs.github.io/apidocs/delivery/en/#index-price-stream
+
+        Update Speed: 3000ms OR 1000ms
+        """
+        if speed == 1:
+            stream_name = "{}@indexPrice@{}s".format(pair.lower(), speed)
+        else:
+            stream_name = "{}@indexPrice".format(pair.lower())
+
+        self.send_message_to_server(stream_name, action=action, id=id)
+
+    def mark_price(self, symbol: str, speed=1, id=None, action=None, **kwargs):
         """Mark Price Streams
 
-        Mark price and funding rate for all symbols pushed every 3 seconds or every second.
+        Stream Name: <symbol>@markPrice OR <symbol>@markPrice@1s
 
-        Stream Name: <symbol>@markPrice or <symbol>@markPrice@1s
+        https://binance-docs.github.io/apidocs/delivery/en/#mark-price-stream
 
-        https://binance-docs.github.io/apidocs/futures/en/#mark-price-stream
-
-        Update Speed: 3000ms or 1000ms
+        Update Speed: 3000ms OR 1000ms
         """
-        stream_name = "{}@markPrice@{}s".format(symbol.lower(), speed)
+        if speed == 1:
+            stream_name = "{}@markPrice@{}s".format(symbol.lower(), speed)
+        else:
+            stream_name = "{}@markPrice".format(symbol.lower())
+
+        self.send_message_to_server(stream_name, action=action, id=id)
+
+    def pair_mark_price(self, pair: str, speed=1, id=None, action=None, **kwargs):
+        """Mark Price of All Symbols of a Pair
+
+        Stream Name: <pair>@markPrice OR <pair>@markPrice@1s
+
+        https://binance-docs.github.io/apidocs/delivery/en/#mark-price-of-all-symbols-of-a-pair
+
+        Update Speed: 3000ms OR 1000ms
+        """
+        if speed == 1:
+            stream_name = "{}@markPrice@{}s".format(pair.lower(), speed)
+        else:
+            stream_name = "{}@markPrice".format(pair.lower())
 
         self.send_message_to_server(stream_name, action=action, id=id)
 
@@ -69,7 +102,7 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         Stream Name: <symbol>@kline_<interval>
 
-        https://binance-docs.github.io/apidocs/futures/en/#kline-candlestick-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#kline-candlestick-streams
 
         interval:
         m -> minutes; h -> hours; d -> days; w -> weeks; M -> months
@@ -111,7 +144,7 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         Stream Name: <pair>_<contractType>@continuousKline_<interval>
 
-        https://binance-docs.github.io/apidocs/futures/en/#continuous-contract-kline-candlestick-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#continuous-contract-kline-candlestick-streams
 
         interval:
         m -> minutes; h -> hours; d -> days; w -> weeks; M -> months
@@ -140,6 +173,70 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         self.send_message_to_server(stream_name, action=action, id=id)
 
+    def index_kline(self, pair: str, interval: str, id=None, action=None, **kwargs):
+        """Kline/Candlestick chart intervals Streams
+
+        Stream Name: <pair>@indexPriceKline_<interval>
+
+        https://binance-docs.github.io/apidocs/delivery/en/#index-kline-candlestick-streams
+
+        interval:
+        m -> minutes; h -> hours; d -> days; w -> weeks; M -> months
+
+        - 1m
+        - 3m
+        - 5m
+        - 15m
+        - 30m
+        - 1h
+        - 2h
+        - 4h
+        - 6h
+        - 8h
+        - 12h
+        - 1d
+        - 3d
+        - 1w
+        - 1M
+
+        Update Speed: 250ms
+        """
+        stream_name = "{}@indexPriceKline_{}".format(pair.lower(), interval)
+
+        self.send_message_to_server(stream_name, action=action, id=id)
+
+    def mark_kline(self, symbol: str, interval: str, id=None, action=None, **kwargs):
+        """Kline/Candlestick chart intervals Streams
+
+        Stream Name: <symbol>@markPriceKline_<interval>
+
+        https://binance-docs.github.io/apidocs/delivery/en/#mark-price-kline-candlestick-streams
+
+        interval:
+        m -> minutes; h -> hours; d -> days; w -> weeks; M -> months
+
+        - 1m
+        - 3m
+        - 5m
+        - 15m
+        - 30m
+        - 1h
+        - 2h
+        - 4h
+        - 6h
+        - 8h
+        - 12h
+        - 1d
+        - 3d
+        - 1w
+        - 1M
+
+        Update Speed: 250ms
+        """
+        stream_name = "{}@markPriceKline_{}".format(symbol.lower(), interval)
+
+        self.send_message_to_server(stream_name, action=action, id=id)
+
     def mini_ticker(self, symbol=None, id=None, action=None, **kwargs):
         """Individual symbol or all symbols mini ticker
 
@@ -149,8 +246,8 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
         Stream Name: <symbol>@miniTicker or
         Stream Name: !miniTicker@arr
 
-        https://binance-docs.github.io/apidocs/futures/en/#individual-symbol-mini-ticker-stream
-        https://binance-docs.github.io/apidocs/futures/en/#individual-symbol-ticker-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#individual-symbol-mini-ticker-stream
+        https://binance-docs.github.io/apidocs/delivery/en/#all-market-mini-tickers-stream
 
         Update Speed: 500ms for individual symbol, 1000ms for all market symbols
         """
@@ -171,8 +268,8 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
         Stream Name: <symbol>@ticker or
         Stream Name: !ticker@arr
 
-        https://binance-docs.github.io/apidocs/futures/en/#individual-symbol-ticker-streams
-        https://binance-docs.github.io/apidocs/futures/en/#all-market-tickers-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#individual-symbol-ticker-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#all-market-tickers-streams
 
         Update Speed: 500ms for individual symbol, 1000ms for all market symbols
         """
@@ -191,8 +288,8 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
         Stream Name: <symbol>@bookTicker or
         Stream Name: !bookTicker
 
-        https://binance-docs.github.io/apidocs/futures/en/#individual-symbol-book-ticker-streams
-        https://binance-docs.github.io/apidocs/futures/en/#all-book-tickers-stream
+        https://binance-docs.github.io/apidocs/delivery/en/#individual-symbol-book-ticker-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#all-book-tickers-stream
 
         Update Speed: Real-time
         """
@@ -208,7 +305,7 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         Stream Name: <symbol>@depth OR <symbol>@depth@500ms OR<symbol>@depth@100ms
 
-        https://binance-docs.github.io/apidocs/futures/en/#diff-book-depth-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#diff-book-depth-streams
 
         Update Speed: 250ms, 500ms or 100ms
         """
@@ -226,7 +323,7 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         Stream Names: <symbol>@depth<levels> OR <symbol>@depth<levels>@500ms OR <symbol>@depth<levels>@100ms
 
-        https://binance-docs.github.io/apidocs/futures/en/#partial-book-depth-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#partial-book-depth-streams
 
         Update Speed: 250ms, 500ms or 100ms
         """
@@ -240,11 +337,10 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
 
         For each symbol，only the latest one liquidation order within 1000ms will be pushed as the snapshot. If no liquidation happens in the interval of 1000ms, no stream will be pushed.
 
-        Stream Name: <symbol>@forceOrder or
-        Stream Name: !forceOrder@arr
+        Stream Name: <symbol>@forceOrder or !forceOrder@arr
 
-        https://binance-docs.github.io/apidocs/futures/en/#liquidation-order-streams
-        https://binance-docs.github.io/apidocs/futures/en/#all-market-liquidation-order-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#liquidation-order-streams
+        https://binance-docs.github.io/apidocs/delivery/en/#all-market-liquidation-order-streams
 
         Update Speed: 1000ms
         """
@@ -253,21 +349,6 @@ class UMFuturesWebsocketClient(BinanceWebsocketClient):
         else:
             stream_name = "{}@forceOrder".format(symbol.lower())
         self.send_message_to_server(stream_name, id=id, action=action)
-
-    def composite_index(self, symbol: str, id=None, action=None, **kwargs):
-        """Composite Index Info Stream
-        Composite index information for index symbols pushed every second.
-
-        Stream Name: <symbol>@compositeIndex
-
-        https://binance-docs.github.io/apidocs/futures/en/#composite-index-symbol-information-streams
-
-        Update Speed: 1000ms
-        """
-
-        self.send_message_to_server(
-            "{}@compositeIndex".format(symbol.lower()), id=id, action=action
-        )
 
     def user_data(self, listen_key: str, id=None, action=None, **kwargs):
         """Listen to user data by using the provided listen_key"""

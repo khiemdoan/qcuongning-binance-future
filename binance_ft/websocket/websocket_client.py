@@ -3,8 +3,8 @@ from typing import Optional
 import json
 import logging
 
-from binance.lib.utils import get_timestamp
-from binance.websocket.binance_socket_manager import BinanceSocketManager
+from binance_ft.lib.utils import get_timestamp
+from binance_ft.websocket.binance_socket_manager import BinanceSocketManager
 
 
 class BinanceWebsocketClient:
