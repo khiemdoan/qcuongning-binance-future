@@ -5,12 +5,12 @@ spot_client = Spot()
 
 import time, sys
 pair = sys.argv[1]
-
-pair_spot = pair.replace("usdt", "busd")
+print(0.075+0.075+0.045*2)
+pair_spot = pair
+# pair_spot = pair.replace("USDT", "FDUSD")
 init_ft = float(um_futures_client.mark_price(pair)['markPrice'])
 init_spot = float(spot_client.ticker_price(pair_spot)['price'])
-
-
+print("init", init_ft, init_spot)
 while True:
     # curret_ft = float(um_futures_client.mark_price(pair)['markPrice'])
     curret_ft = float(um_futures_client.book_ticker(pair)['askPrice'])  # > mark price
@@ -22,7 +22,7 @@ while True:
     gap_ft = -(curret_ft - init_ft)/init_ft * 100
     gap_spot = (curret_spot - init_spot)/init_spot * 100
 
-    if gap_spot + gap_ft > 0.15:
+    if gap_spot + gap_ft > 0.25:
         print(gap_spot + gap_ft)
         if gap_spot > 0:
             print("tang")
