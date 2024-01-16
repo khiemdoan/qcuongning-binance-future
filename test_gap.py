@@ -14,6 +14,7 @@ print("init", init_ft, init_spot)
 while True:
     # curret_ft = float(um_futures_client.mark_price(pair)['markPrice'])
     curret_ft = float(um_futures_client.book_ticker(pair)['askPrice'])  # > mark price
+    # print(curret_ft)
     # curret_spot = float(spot_client.ticker_price(pair)['price'])
     curret_spot = float(spot_client.book_ticker(pair_spot)['bidPrice'])  # < mark price
 
