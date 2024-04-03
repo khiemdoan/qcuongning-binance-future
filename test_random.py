@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from binance_ft.um_futures import UMFutures
 import time
@@ -45,23 +46,21 @@ while True:
     gap_ft = -(ask_ft - init_ft)/init_ft * 100
     gap_spot = (bid_spot - init_spot)/init_spot * 100
     gap = gap_ft + gap_spot
-    if gap > thresh_gap:
-        if gap > max_gap:
-            max_gap = gap
-            time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
-            mark_ft_at_this_gap = mark_ft
-            dict_price[index] = {}
-            dict_price[index]["time"] = time_get_gap
-            dict_price[index]["side"] = "tang" if gap_spot > 0 else "giam"
-            dict_price[index]["gap"] = round(max_gap,2)
-            dict_price[index]["mark_price"] = mark_ft_at_this_gap
-            dict_price[index]["highest_price"] = mark_ft_at_this_gap
-            dict_price[index]["highest_rate"] = 100
-            dict_price[index]['break'] = False
-            dict_price[index]['low_boundary'] = mark_ft_at_this_gap * cut_loss
-    elif max_gap > 0:
-        index += 1
-        max_gap = 0
+    if np.random.random() > 0.98:
+        time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
+        mark_ft_at_this_gap = mark_ft
+        dict_price[index] = {}
+        dict_price[index]["time"] = time_get_gap
+        dict_price[index]["side"] = "tang" if gap_spot > 0 else "giam"
+        dict_price[index]["gap"] = 0
+        dict_price[index]["mark_price"] = mark_ft_at_this_gap
+        dict_price[index]["highest_price"] = mark_ft_at_this_gap
+        dict_price[index]["highest_rate"] = 100
+        dict_price[index]['break'] = False
+        dict_price[index]['low_boundary'] = mark_ft_at_this_gap * cut_loss
+        index+=1
+
+    
     
     if len(print_dict) != len(dict_price):
         print_dict = copy.deepcopy(dict_price)
@@ -70,7 +69,7 @@ while True:
             print(print_dict[dictt])
 
         df = pd.DataFrame.from_dict(dict_price, orient='index')
-        excel_file_path = f'data_test_gap_{pair}_{cut_loss}.xlsx'
+        excel_file_path = f'data_test_gap_{pair}_{cut_loss}_random.xlsx'
         df.to_excel(excel_file_path)
     time.sleep(0.1)
         
