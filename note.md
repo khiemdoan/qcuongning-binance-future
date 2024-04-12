@@ -24,7 +24,6 @@ response query order:
  'time': 1694280485055,
  'updateTime': 1694280485055}
 
-
  response spot create new order
 
  {'symbol': 'CHRUSDT',
@@ -48,8 +47,7 @@ response query order:
    'tradeId': 73326783}],
  'selfTradePreventionMode': 'NONE'}
 
-
- respose get order spot 
+ respose get order spot
  {'symbol': 'TRBBUSD',
  'orderId': 177230881,
  'orderListId': -1,
@@ -70,3 +68,8 @@ response query order:
  'workingTime': 1694709613370,
  'origQuoteOrderQty': '0.00000000',
  'selfTradePreventionMode': 'NONE'}
+
+
+response future get acount trade
+
+[{'symbol': 'ETHUSDT', 'id': 127177287, 'orderId': 1340938863, 'side': 'SELL', 'price': '3657', 'qty': '0.027', 'realizedPnl': '0', 'marginAsset': 'USDT', 'quoteQty': '98.73900', 'commission': '0.03949560', 'commissionAsset': 'USDT', 'time': 1712581108069, 'positionSide': 'BOTH', 'buyer': False, 'maker': False}]
