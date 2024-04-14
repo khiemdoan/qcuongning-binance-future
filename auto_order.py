@@ -3,31 +3,25 @@
 import sys
 import time, math
 from binance_ft.um_futures import UMFutures
-from random_order import get_commision, get_precision, get_status_pos, key, secret
+from helper import get_commision, get_precision, get_status_pos, key, secret
 
 
 if __name__ == "__main__":
     # um_futures_client = UMFutures(key=key, secret=secret)
 
     um_futures_client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
-
-    usdt = 300
+    low_ratio = 0.99
+    high_ratio = 1.05
+    usdt = 500
     pair = sys.argv[1]
     print("******", pair, "*******")
 
     precision_ft = get_precision(pair, um_futures_client)
 
+    askPrice = float(um_futures_client.book_ticker(pair)['askPrice'])
 
-    # now_ft_price = float(um_futures_client.mark_price(pair)['markPrice']) 
-    # bid_price = float(um_futures_client.book_ticker(pair)['bidPrice'])
-    bid_price = float(um_futures_client.book_ticker(pair)['askPrice'])
-
-    
-
-
-
-    quantity_ft = round((usdt)/bid_price, precision_ft)
-    print("bid price:", round(bid_price,4), "quantity: ", quantity_ft)
+    quantity_ft = round((usdt)/askPrice, precision_ft)
+    print("askPrice:", round(askPrice,4), "quantity: ", quantity_ft)
 
     a,b,c  = get_status_pos(pair, um_futures_client)
     if c != 0:
@@ -40,19 +34,18 @@ if __name__ == "__main__":
 
         print(f"already set a open at {a}, with {coin_open} {pair}, pnl {b}")
     else:
-        open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = bid_price, timeInForce="GTC")
+        open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
         # open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="MARKET", quantity=quantity_ft)        
         commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(open_future, um_futures_client, pair)
         
         coin_open = round(coin_open, precision_ft)
 
-    low_ratio = 0.99
-    high_ratio = 1.05
+
 
     
 
 
-    print("commis, usdt_open, coin_open", commis, usdt_open, coin_open, "mean_price", mean_price)
+    print(f"commis: {commis:.3f}, usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}")
     print("[SELL] close if price lower: ", mean_price * low_ratio, "or higher than", mean_price * high_ratio)
     while True:
         ask_price = float(um_futures_client.book_ticker(pair)['askPrice'])
@@ -65,8 +58,8 @@ if __name__ == "__main__":
 
     commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close = get_commision(close_future, um_futures_client, pair)
 
-    print("commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close")
-    print(commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close)
+    column_width = 20
+    print(f"commision_close: {commision_close:.3f}, usdt_close: {all_spend_close:.3f} coin_close: {all_coin_close:.3f}, mean_price_close: {mean_price_close:.3f}, ")
 
     print("final pnl: ", all_pnl_close - commis - commision_close)
 

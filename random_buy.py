@@ -1,10 +1,8 @@
-key="7NvUEUX4tnzOja5KQ99gmUG37DQOV9oelvz1akWAr2Zts9X57djRMwbvfgjQoykp"
-secret="X9CWCXNsdypjEU8Q0AQaoaqPrcnaX4wpDe5KVxsAfThkVJJAvufiGJ3tb95QqnQC"
-# key api test2
-import sys
-import time, math
+
+# key api test2import sys
+import time, math,sys
 from binance_ft.um_futures import UMFutures
-from random_order import key, secret, get_commision, get_precision, get_status_pos
+from helper import get_commision, get_precision, get_status_pos, key, secret
 
 if __name__ == "__main__":
     um_futures_client = UMFutures(key=key, secret=secret)
@@ -22,8 +20,8 @@ if __name__ == "__main__":
     bid_price = float(um_futures_client.book_ticker(pair)['bidPrice'])
     ask_price = float(um_futures_client.book_ticker(pair)['askPrice'])
 
-    quantity_ft = round((usdt)/ask_price, precision_ft)
-    print("bid price:", round(ask_price,4), "quantity: ", quantity_ft)
+    quantity_ft = round((usdt)/bid_price, precision_ft)
+    print("bid price:", round(bid_price,4), "quantity: ", quantity_ft)
 
     a,b,c  = get_status_pos(pair, um_futures_client)
     if c != 0:
@@ -36,8 +34,8 @@ if __name__ == "__main__":
 
         print(f"already set a open at {a}, with {coin_open} {pair}, pnnl {b}")
     else:
-        open_future = um_futures_client.new_order(symbol=pair, side="BUY", type="MARKET", quantity=quantity_ft)
-        time.sleep(1)
+        open_future = um_futures_client.new_order(symbol=pair, side="BUY", type="LIMIT", quantity=quantity_ft, price = bid_price, timeInForce="GTC")
+        # open_future = um_futures_client.new_order(symbol=pair, side="BUY", type="MARKET", quantity=quantity_ft)
         commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(open_future, um_futures_client, pair)
         coin_open = round(coin_open, precision_ft)
 
@@ -60,8 +58,9 @@ if __name__ == "__main__":
 
     commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close = get_commision(close_future, um_futures_client, pair)
 
-    print("commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close")
-    print(commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close)
+
+    print(f"commision_close: {commision_close:.3f}, usdt_close: {all_spend_close:.3f} coin_close: {all_coin_close:.3f}, mean_price_close: {mean_price_close:.3f}, ")
+
 
     print("final pnl: ", all_pnl_close - commis - commision_close)
 

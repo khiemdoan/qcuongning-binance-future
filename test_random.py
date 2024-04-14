@@ -24,7 +24,10 @@ print_dict = {}
 
 index = 0
 
-
+sleep_time_new_order = 0.2 #h
+sleep_time_new_order_sec = sleep_time_new_order * 60 * 60
+random_sleep = 0
+time_order = time.time()
 while True:
     mark_ft = float(um_futures_client.book_ticker(pair)['bidPrice'])
 
@@ -43,21 +46,23 @@ while True:
         if ask_ft < dict_price[key]['low_boundary'] or ask_ft >= dict_price[key]['high_boundary']:
             dict_price[key]['break'] = True
         
-        
-    if np.random.random() > 0.98:
-        time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
-        mark_ft_at_this_gap = mark_ft
-        dict_price[index] = {}
-        dict_price[index]["time"] = time_get_gap
-        dict_price[index]["gap"] = 0
-        dict_price[index]["mark_price"] = mark_ft_at_this_gap
-        dict_price[index]["highest_price"] = mark_ft_at_this_gap
-        dict_price[index]["highest_rate"] = 100
-        dict_price[index]['break'] = False
-        dict_price[index]['low_boundary'] = mark_ft_at_this_gap * cut_loss
-        dict_price[index]['high_boundary'] = mark_ft_at_this_gap * take_profit
+    if time.time() - time_order > random_sleep:
+        if np.random.random() > 0.98:
+            time_order = time.time()
+            random_sleep = np.random.randint(int(sleep_time_new_order_sec*0.8), int(sleep_time_new_order_sec*1.2))
+            time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
+            mark_ft_at_this_gap = mark_ft
+            dict_price[index] = {}
+            dict_price[index]["time"] = time_get_gap
+            dict_price[index]["gap"] = 0
+            dict_price[index]["mark_price"] = mark_ft_at_this_gap
+            dict_price[index]["highest_price"] = mark_ft_at_this_gap
+            dict_price[index]["highest_rate"] = 100
+            dict_price[index]['break'] = False
+            dict_price[index]['low_boundary'] = mark_ft_at_this_gap * cut_loss
+            dict_price[index]['high_boundary'] = mark_ft_at_this_gap * take_profit
 
-        index+=1
+            index+=1
 
     
     
@@ -68,9 +73,9 @@ while True:
         #     print(print_dict[dictt])
 
         df = pd.DataFrame.from_dict(dict_price, orient='index')
-        excel_file_path = f'data_test_gap_{pair}_{cut_loss}_random.xlsx'
+        excel_file_path = f'{pair}_{cut_loss}_{sleep_time_new_order}.xlsx'
         df.to_excel(excel_file_path)
-    time.sleep(0.1)
+    time.sleep(1)
         
 
 
