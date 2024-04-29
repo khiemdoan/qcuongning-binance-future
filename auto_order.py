@@ -1,67 +1,110 @@
-
-# key api test2
-import sys
-import time, math
+import os
+import numpy as np
+import pandas as pd
 from binance_ft.um_futures import UMFutures
-from helper import get_commision, get_precision, get_status_pos, key, secret
+import time
+import copy
+import time, sys
+from helper import get_commision, get_precision, get_status_pos, key, secret, xlsx_to_nested_dict
+import threading
+from binance_ft.error import ClientError
+
+# um_futures_client = UMFutures(key=key, secret=secret)
+um_futures_client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
+pair = sys.argv[1]
+cut_loss = 0.99
+take_profit = 1.05
+pair_spot = pair
+usdt = 1000
+prob_open = 0.9
+precision_ft = get_precision(pair, um_futures_client)
+# um_futures_client.cancel_open_orders(symbol=pair, recvWindow=2000)
+sleep_time_new_order = 0.01 #h
+sleep_time_new_order_sec = sleep_time_new_order * 60 * 60
+print("sleep_time_new_order:", sleep_time_new_order_sec)
+excel_file_path = f'{pair}_{cut_loss}_{sleep_time_new_order}.xlsx'
+if os.path.exists(excel_file_path):
+    df = pd.read_excel(excel_file_path, header=0, index_col=0)
+    dict_price = df.to_dict('index')
+    print(f"load previous {excel_file_path} contain {len(dict_price)} with {len(df[df['break']==True])} break and {len(df[df['filled']==True])} filled")
+    index = len(dict_price)
+
+else:
+    index = 0
+    dict_price = {}
 
 
-if __name__ == "__main__":
-    # um_futures_client = UMFutures(key=key, secret=secret)
 
-    um_futures_client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
-    low_ratio = 0.99
-    high_ratio = 1.05
-    usdt = 500
-    pair = sys.argv[1]
-    print("******", pair, "*******")
+random_sleep = 0
+time_order = time.time()
+while True:
+    bidPrice = float(um_futures_client.book_ticker(pair)['bidPrice'])
 
-    precision_ft = get_precision(pair, um_futures_client)
+    askPrice = float(um_futures_client.book_ticker(pair)['askPrice'])  # > mark price
 
-    askPrice = float(um_futures_client.book_ticker(pair)['askPrice'])
+    for key in dict_price.keys():
+        if not dict_price[key]['filled']:
+            try:
+                res_query = um_futures_client.query_order(symbol=pair, orderId=dict_price[key]['orderId'], recvWindow=6000)
+            except ClientError:
+                print(key, dict_price[key])
+            if res_query['status'] == "FILLED":
+                commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(dict_price[key]['orderId'], um_futures_client, pair)
+                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"Open order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")
+                dict_price[key]['filled'] = True
+                dict_price[key]['coin'] = round(coin_open, precision_ft)
+                dict_price[key]['commis'] = commis
+            elif res_query['status'] == "CANCELED":
+                dict_price[key]['filled'] = "CANCELED"
 
-    quantity_ft = round((usdt)/askPrice, precision_ft)
-    print("askPrice:", round(askPrice,4), "quantity: ", quantity_ft)
 
-    a,b,c  = get_status_pos(pair, um_futures_client)
-    if c != 0:
-        usdt_open = usdt
-        commis = usdt * 0.0005
-        coin_open = c
-        mean_price = a
-        all_pnl = b
-        coin_open = round(coin_open, precision_ft)
 
-        print(f"already set a open at {a}, with {coin_open} {pair}, pnl {b}")
-    else:
-        open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
-        # open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="MARKET", quantity=quantity_ft)        
-        commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(open_future, um_futures_client, pair)
+        if dict_price[key]['filled']:
+            if dict_price[key]['break']:
+                continue
+            if askPrice > dict_price[key]['highest_price']:
+                dict_price[key]['highest_price'] = askPrice
+                dict_price[key]["highest_rate"]  = askPrice/dict_price[key]["askPrice"] *100
+            if askPrice < dict_price[key]['low_boundary'] or askPrice >= dict_price[key]['high_boundary']:
+                close_future = um_futures_client.new_order(symbol=pair, side="BUY", type="MARKET", quantity=dict_price[key]['coin'])
+                time.sleep(0.5)
+                commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(close_future['orderId'], um_futures_client, pair)
+                print(time.strftime("%Y-%m-%d %H:%M:%S"), f"Close order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")
+
+                dict_price[key]['commis'] += commis
+                dict_price[key]['pnl'] = coin_open * (dict_price[key]["askPrice"] - mean_price) - dict_price[key]['commis']
+                dict_price[key]['break'] = True
         
-        coin_open = round(coin_open, precision_ft)
+    if time.time() - time_order > random_sleep:
+        if np.random.random() > prob_open:
+            # print("time to open new order")
+            time_order = time.time()
+            random_sleep = np.random.randint(int(sleep_time_new_order_sec*0.8), int(sleep_time_new_order_sec*1.2))
+            time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
+            quantity_ft = round((usdt)/askPrice, precision_ft)
+            print("\n-----",time.strftime("%Y-%m-%d %H:%M:%S"), "-----")
+            print(f"create new order {index} with {quantity_ft} {pair}")
+            open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
+            mark_ft_at_this_gap = askPrice
+            dict_price[index] = {}
+            dict_price[index]["time"] = time_get_gap
+            dict_price[index]["askPrice"] = mark_ft_at_this_gap
+            dict_price[index]["highest_price"] = mark_ft_at_this_gap
+            dict_price[index]["highest_rate"] = 100
+            dict_price[index]['break'] = False
+            dict_price[index]['low_boundary'] = mark_ft_at_this_gap * cut_loss
+            dict_price[index]['high_boundary'] = mark_ft_at_this_gap * take_profit
+            dict_price[index]['orderId'] = open_future["orderId"]
+            dict_price[index]['filled'] = False
 
+            index+=1
+            df = pd.DataFrame.from_dict(dict_price, orient='index')
+            df.to_excel(excel_file_path)
+            # x = threading.Thread(target=get_commision, args=(open_future, um_futures_client, pair))
+            # x.start()
 
-
-    
-
-
-    print(f"commis: {commis:.3f}, usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}")
-    print("[SELL] close if price lower: ", mean_price * low_ratio, "or higher than", mean_price * high_ratio)
-    while True:
-        ask_price = float(um_futures_client.book_ticker(pair)['askPrice'])
-        if ask_price < mean_price *low_ratio or ask_price > mean_price * high_ratio:
-            print("ask_price", ask_price)
-            close_future = um_futures_client.new_order(symbol=pair, side="BUY", type="MARKET", quantity=coin_open)
-            time.sleep(1)
-            break
-        time.sleep(0.1)
-
-    commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close = get_commision(close_future, um_futures_client, pair)
-
-    column_width = 20
-    print(f"commision_close: {commision_close:.3f}, usdt_close: {all_spend_close:.3f} coin_close: {all_coin_close:.3f}, mean_price_close: {mean_price_close:.3f}, ")
-
-    print("final pnl: ", all_pnl_close - commis - commision_close)
+    time.sleep(1)
+        
 
 
 

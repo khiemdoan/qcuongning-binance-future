@@ -4,11 +4,26 @@ secret="X9CWCXNsdypjEU8Q0AQaoaqPrcnaX4wpDe5KVxsAfThkVJJAvufiGJ3tb95QqnQC"
 import sys
 import time, math
 from binance_ft.um_futures import UMFutures
+import openpyxl
 
-def get_commision(order_dict, um_futures_client, pair):
+def xlsx_to_nested_dict(file_path):
+    workbook = openpyxl.load_workbook(file_path)
+    sheet = workbook.active
+
+    data = {}
+
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        key = row[0]
+        values = row[1:]
+        data[key] = {}
+        for col_idx, col_value in enumerate(values, start=1):
+            data[key][sheet.cell(row=1, column=col_idx).value] = col_value
+
+    return data
+
+def get_commision(ft_order_id, um_futures_client, pair):
     bnb_price = float(um_futures_client.ticker_price("BNBUSDT")['price'])
 
-    ft_order_id = order_dict["orderId"]
     
     while True:
         res_query = um_futures_client.query_order(symbol=pair, orderId=ft_order_id, recvWindow=6000)
@@ -22,7 +37,7 @@ def get_commision(order_dict, um_futures_client, pair):
         if res['commissionAsset']=="USDT":
             commision_open_future += float(res['commission'])
         elif res['commissionAsset']=="BNB":
-            commision_open_future += float(res['commission']) *bnb_price
+            commision_open_future += float(res['commission'])*bnb_price
     all_spend = sum([float(res['quoteQty']) for res in res_ft_open])
     all_coin = sum([float(res['qty']) for res in res_ft_open])
     all_pnl = sum([float(res['realizedPnl']) for res in res_ft_open])
@@ -41,7 +56,7 @@ def get_precision(pair, um_futures_client):
     return precision_ft
 
 def get_status_pos(pair, um_futures_client):
-    list_risks = um_futures_client.get_position_risk()
+    list_risks = um_futures_client.get_position_risk(recvWindow=6000)
     for pos in list_risks:
         if pos['symbol'] == pair:
             mean_price = float(pos['entryPrice'])

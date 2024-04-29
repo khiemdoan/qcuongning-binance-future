@@ -24,7 +24,7 @@ print_dict = {}
 
 index = 0
 
-sleep_time_new_order = 0.2 #h
+sleep_time_new_order = 0.1 #h
 sleep_time_new_order_sec = sleep_time_new_order * 60 * 60
 random_sleep = 0
 time_order = time.time()
@@ -73,7 +73,7 @@ while True:
         #     print(print_dict[dictt])
 
         df = pd.DataFrame.from_dict(dict_price, orient='index')
-        excel_file_path = f'{pair}_{cut_loss}_{sleep_time_new_order}.xlsx'
+        excel_file_path = f'{pair}_{cut_loss}_{sleep_time_new_order}_4.xlsx'
         df.to_excel(excel_file_path)
     time.sleep(1)
         

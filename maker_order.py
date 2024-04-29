@@ -42,7 +42,7 @@ if __name__ == "__main__":
     else:
         open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
         # open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="MARKET", quantity=quantity_ft)        
-        commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(open_future, um_futures_client, pair)
+        commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(open_future['orderId'], um_futures_client, pair)
         
         coin_open = round(coin_open, precision_ft)
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
             break
         time.sleep(0.1)
 
-    commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close = get_commision(close_future, um_futures_client, pair)
+    commision_close, all_spend_close, all_coin_close, mean_price_close, all_pnl_close = get_commision(close_future['orderId'], um_futures_client, pair)
 
     column_width = 20
     print(f"commision_close: {commision_close:.3f}, usdt_close: {all_spend_close:.3f} coin_close: {all_coin_close:.3f}, mean_price_close: {mean_price_close:.3f}, ")
