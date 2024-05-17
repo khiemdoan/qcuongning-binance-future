@@ -47,7 +47,7 @@ while True:
             dict_price[key]['break'] = True
         
     if time.time() - time_order > random_sleep:
-        if np.random.random() > 0.98:
+        if np.random.random() > 0.9:
             time_order = time.time()
             random_sleep = np.random.randint(int(sleep_time_new_order_sec*0.8), int(sleep_time_new_order_sec*1.2))
             time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")

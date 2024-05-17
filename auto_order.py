@@ -8,21 +8,25 @@ from helper import get_commision, get_precision, get_status_pos, key, secret, xl
 from binance_ft.error import ClientError
 import requests
 
-# um_futures_client = UMFutures(key=key, secret=secret)
-um_futures_client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
+um_futures_client = UMFutures(key=key, secret=secret)
+print("import um_futures_client")
+# um_futures_client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
 pair = sys.argv[1]
 cut_loss = 0.99
 take_profit = 1.05
 pair_spot = pair
-usdt = 1000
+usdt = 100
 prob_open = 0.9
-enable_new_order = True
-precision_ft = get_precision(pair, um_futures_client)
-um_futures_client.cancel_open_orders(symbol=pair, recvWindow=2000)
-sleep_time_new_order = 0.1 #h
+enable_new_order = False
+# precision_ft = get_precision(pair, um_futures_client)
+precision_ft = 1
+
+# um_futures_client.cancel_open_orders(symbol=pair, recvWindow=2000)
+sleep_time_new_order = 0.4 #h
 sleep_time_new_order_sec = sleep_time_new_order * 60 * 60
 print("sleep_time_new_order:", sleep_time_new_order_sec)
-excel_file_path = f'{pair}_{cut_loss}_{sleep_time_new_order}.xlsx'
+date = time.strftime("%Y-%m-%d")
+excel_file_path = f'{pair}_{cut_loss}_{sleep_time_new_order}_{date}.xlsx'
 if os.path.exists(excel_file_path):
     df = pd.read_excel(excel_file_path, header=0, index_col=0)
     dict_price = df.to_dict('index')
@@ -30,6 +34,10 @@ if os.path.exists(excel_file_path):
     index = len(dict_price)
 
 else:
+    try:
+        requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=-----new-----")
+    except requests.exceptions.ConnectionError as e:
+        print(e)
     index = 0
     dict_price = {}
 
@@ -41,6 +49,10 @@ while True:
     bidPrice = float(um_futures_client.book_ticker(pair)['bidPrice'])
 
     askPrice = float(um_futures_client.book_ticker(pair)['askPrice'])  # > mark price
+    if askPrice > 38:
+        enable_new_order = True
+    elif  askPrice < 37:
+        enable_new_order = False
 
     for key in dict_price.keys():
         if not dict_price[key]['filled']:
@@ -54,7 +66,7 @@ while True:
                 dict_price[key]['filled'] = True
                 dict_price[key]['coin'] = round(coin_open, precision_ft)
                 dict_price[key]['commis'] = round(commis,2)
-                msg = f"order_id_{dict_price[key]['orderId']}_at_{mean_price}_low_{dict_price[key]['low_boundary']}_high_{dict_price[key]['high_boundary']}"
+                msg = f"xxx-key_{key}_at_{mean_price:.3f}_low_{dict_price[key]['low_boundary']:.2f}_high_{dict_price[key]['high_boundary']:.2f}"
                 requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={msg}")
             elif res_query['status'] == "CANCELED":
                 dict_price[key]['filled'] = "CANCELED"
@@ -64,6 +76,7 @@ while True:
         if dict_price[key]['filled'] is True:
             if dict_price[key]['break']:
                 continue
+            dict_price[key]['pnl'] = dict_price[key]['coin'] * (dict_price[key]['askPrice'] - askPrice)
             if askPrice > dict_price[key]['highest_price']:
                 dict_price[key]['highest_price'] = askPrice
                 dict_price[key]["highest_rate"]  = round(askPrice/dict_price[key]["askPrice"] *100, 1)
@@ -78,7 +91,7 @@ while True:
 
                 dict_price[key]['pnl'] = coin_open * (dict_price[key]["askPrice"] - mean_price) - dict_price[key]['commis']
                 dict_price[key]['break'] = True
-                msg = f"close_id_{dict_price[key]['orderId']}_pnl_{dict_price[key]['pnl']}"
+                msg = f"kkk_close_id_{key}_pnl_{dict_price[key]['pnl']:.2f}_price_{mean_price:.3f}"
                 requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={msg}")
                 df = pd.DataFrame.from_dict(dict_price, orient='index')
                 df.to_excel(excel_file_path)
@@ -91,8 +104,14 @@ while True:
             if enable_new_order:
                 time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
                 quantity_ft = round((usdt)/askPrice, precision_ft)
-                print(f"create new order {index} with {quantity_ft} {pair}")
-                open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
+                msg = f"{time_get_gap} create new order {index} with {quantity_ft} {pair} at price {askPrice}"
+                requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={msg}")
+                try:
+                    open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
+                except ClientError as error:
+                    enable_new_order = False
+                    print(error.error_message)
+                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={error.error_message}")
                 mark_ft_at_this_gap = askPrice
                 dict_price[index] = {}
                 dict_price[index]["time"] = time_get_gap
