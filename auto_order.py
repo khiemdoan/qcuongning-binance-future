@@ -22,10 +22,11 @@ pair = sys.argv[1]
 cut_loss = 0.99
 take_profit = 1.05
 pair_spot = pair
-usdt = 150
+usdt = 120
 prob_open = 0.9
 enable_new_order = False
 precision_ft = get_precision(pair, um_futures_client)
+df = None
 
 # um_futures_client.cancel_open_orders(symbol=pair, recvWindow=2000)
 sleep_time_new_order = 0.4 #h
@@ -49,29 +50,42 @@ else:
 
 
 
-random_sleep = sleep_time_new_order_sec//2
+random_sleep = 0
 time_order = time.time()
 indexz = 0
 reply = True
+mark_ft_at_this_gap = None
 while True:
     indexz += 1
     bidPrice = float(um_futures_client.book_ticker(pair)['bidPrice'])
 
     askPrice = float(um_futures_client.book_ticker(pair)['askPrice'])  # > mark price
 
-    response = um_futures_client.account(recvWindow=6000)
-    for assett in response['assets']:
-        if assett['asset'] == "USDT":
-            if float(assett['walletBalance']) > 0 and not reply:
-                reply = True
-                requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=alive")
-            elif float(assett['walletBalance']) ==  0:
-                reply = False
+    try:
+        response = um_futures_client.account(recvWindow=6000)
+        for assett in response['assets']:
+            if assett['asset'] == "USDT":
+                if 0.3>float(assett['walletBalance']) > 0 and not reply:
+                    reply = True
+                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=alive-enable_new_order-{enable_new_order}")
+                elif 0.6>float(assett['walletBalance']) > 0.3 and not reply:
+                    reply = True
+                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=turn on")
+                    enable_new_order = True
+                    random_sleep = 0
+                elif 1>float(assett['walletBalance']) > 0.6 and not reply:
+                    reply = True
+                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=turn off")
+                    enable_new_order = False
+                elif float(assett['walletBalance']) ==  0:
+                    reply = False
+    except ClientError as err:
+        print("get acount error: ", err.error_message)
 
-    if askPrice > 40.5:
-        enable_new_order = True
-    elif  askPrice < 40:
-        enable_new_order = False
+    # if askPrice > 43.7:
+    #     enable_new_order = True
+    # elif  askPrice < 43.3:
+    #     enable_new_order = False
     msg = ""
     for key in dict_price.keys():
         if not dict_price[key]['filled']:
@@ -112,10 +126,17 @@ while True:
                 msg += f"*close* id: {key}, pnl: {dict_price[key]['pnl']:.2f}, price:{mean_price:.2f}\n"
                 
     if len(msg) > 0:
-        requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={msg}&parse_mode=Markdown")
+        try:
+            requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={msg}&parse_mode=Markdown")
+        except requests.exceptions.SSLError as e:
+            print("Update info", e.error_message)
         df = pd.DataFrame.from_dict(dict_price, orient='index')
         df.to_excel(excel_file_path)
-        
+    
+    if mark_ft_at_this_gap is not None and  askPrice > mark_ft_at_this_gap * 1.1:
+        requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=Open early")
+        random_sleep = 0
+
     if time.time() - time_order > random_sleep:
         if np.random.random() > prob_open:
             time_order = time.time()
@@ -143,18 +164,25 @@ while True:
                 dict_price[index]['high_boundary'] = mark_ft_at_this_gap * take_profit
                 dict_price[index]['orderId'] = open_future["orderId"]
                 dict_price[index]['filled'] = False
+                dict_price[index]['close_price'] = 0
+                dict_price[index]['pnl'] = 0
+
 
                 index+=1
             df = pd.DataFrame.from_dict(dict_price, orient='index')
             df.to_excel(excel_file_path)
             # x = threading.Thread(target=get_commision, args=(open_future, um_futures_client, pair))
             # x.start()
-    if indexz % 500 == 0:
-        md = parse_df_markdown(df)
-        try:
-            requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={md}&parse_mode=Markdown")
-        except requests.exceptions.SSLError as e:
-            print("post markdown error", e.error_message)
+    if indexz % 400 == 0:
+        if df is not None:
+            
+            try:
+                df = pd.DataFrame.from_dict(dict_price, orient='index')
+
+                md = parse_df_markdown(df)
+                requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={md}&parse_mode=Markdown")
+            except (requests.exceptions.SSLError, KeyError) as e:
+                print("post markdown error", e.error_message)
     time.sleep(1)
         
 
