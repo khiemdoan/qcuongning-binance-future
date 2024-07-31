@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     # um_futures_client = UMFutures(key=key, secret=secret, base_url="https://testnet.binancefuture.com")
 
-    usdt = 300
+    usdt = 500  
     pair = sys.argv[1]
     print("******", pair, "*******")
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         coin_open = round(coin_open, precision_ft)
 
     low_ratio = 0.95
-    high_ratio = 1.01
+    high_ratio = 1.015
 
     
 

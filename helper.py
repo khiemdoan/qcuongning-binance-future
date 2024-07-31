@@ -3,6 +3,7 @@ secret="X9CWCXNsdypjEU8Q0AQaoaqPrcnaX4wpDe5KVxsAfThkVJJAvufiGJ3tb95QqnQC"
 # key api test2
 import sys
 import time, math
+import binance_ft
 from binance_ft.um_futures import UMFutures
 import openpyxl
 

@@ -11,7 +11,8 @@ import argparse
 parser = argparse.ArgumentParser(description='A simple example script to demonstrate argparse')
 parser.add_argument('pair', type=str, default= "ORDIUSDC",help='The name of the pair to process')
 parser.add_argument("--vol", type=int, default=300)
-parser.add_argument("--s", action='store_true')
+parser.add_argument("--en", action='store_true')
+
 args = parser.parse_args()
 
 def parse_df_markdown(df):
@@ -30,7 +31,7 @@ take_profit = 1.05
 pair_spot = pair
 usdt = args.vol
 prob_open = 0.5
-enable_new_order = True
+enable_new_order = args.en
 precision_ft = get_precision(pair, um_futures_client)
 df = None
 
@@ -47,10 +48,10 @@ if os.path.exists(excel_file_path):
     index = len(dict_price)
 
 else:
-    try:
-        requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=-----new-----")
-    except requests.exceptions.ConnectionError as e:
-        print(e)
+    # try:
+    #     requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=-----new-----")
+    # except requests.exceptions.ConnectionError as e:
+    #     print(e)
     index = 0
     dict_price = {}
 
@@ -61,6 +62,7 @@ time_order = time.time()
 indexz = 350
 reply = True
 mark_ft_at_this_gap = 0
+temp = False
 while True:
     indexz += 1
     bidPrice = float(um_futures_client.book_ticker(pair)['bidPrice'])
@@ -71,28 +73,15 @@ while True:
         response = um_futures_client.account(recvWindow=6000)
         for assett in response['assets']:
             if assett['asset'] == "USDT":
-                if 0.3>float(assett['walletBalance']) > 0 and not reply:
+                if float(assett['walletBalance']) > 0 and not reply:
                     reply = True
-                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=alive-enable_new_order-{enable_new_order}")
-                elif 0.6>float(assett['walletBalance']) > 0.3 and not reply:
-                    reply = True
-                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=turn on")
-                    mark_ft_at_this_gap = askPrice * 0.998
                     enable_new_order = True
-                    random_sleep = 0
-                elif 1>float(assett['walletBalance']) > 0.6 and not reply:
-                    reply = True
-                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=turn off")
-                    enable_new_order = False
+                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=alive-enable_new_order-{enable_new_order}")
                 elif float(assett['walletBalance']) ==  0:
                     reply = False
     except ClientError as err:
+        pass
         print("get acount error: ", err.error_message)
-
-    # if askPrice > 38.9:
-    #     enable_new_order = True
-    # elif  askPrice < 38.5:
-    #     enable_new_order = False
     msg = ""
     for key in dict_price.keys():
         if not dict_price[key]['filled']:
@@ -139,52 +128,47 @@ while True:
             print("Update info", e)
         df = pd.DataFrame.from_dict(dict_price, orient='index')
         df.to_excel(excel_file_path)
+
+    # if askPrice > 38.5 and not temp:
+    #     enable_new_order = True602
     
-    # if mark_ft_at_this_gap is not None and  askPrice > mark_ft_at_this_gap * 1.1:
-    #     requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=Open early")
-    #     random_sleep = 0
-    time_to_new_order = random_sleep - (time.time() - time_order) 
-    if  time_to_new_order <=0:
-        if np.random.random() > prob_open and askPrice > mark_ft_at_this_gap * 1.005:
-            time_order = time.time()
-            print("\n-----",time.strftime("%Y-%m-%d %H:%M:%S"), "-----")
-            random_sleep = 300
-            if enable_new_order:
-                random_sleep = np.random.randint(int(sleep_time_new_order_sec*0.8), int(sleep_time_new_order_sec*1.2))
-                time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
-                quantity_ft = round((usdt)/askPrice, precision_ft)
-                msg = f"{time_get_gap} create new order {index} price: {askPrice}"
-                requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={msg}")
-                try:
-                    open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
-                except ClientError as error:
-                    enable_new_order = False
-                    print(error.error_message)
-                    requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={error.error_message}")
-                mark_ft_at_this_gap = askPrice
-                dict_price[index] = {}
-                dict_price[index]["time"] = time_get_gap
-                dict_price[index]["askPrice"] = mark_ft_at_this_gap
-                dict_price[index]["highest_price"] = mark_ft_at_this_gap
-                dict_price[index]["highest_rate"] = 100
-                dict_price[index]['break'] = False
-                dict_price[index]['low_boundary'] = mark_ft_at_this_gap * cut_loss
-                dict_price[index]['high_boundary'] = mark_ft_at_this_gap * take_profit
-                dict_price[index]['orderId'] = open_future["orderId"]
-                dict_price[index]['filled'] = False
-                dict_price[index]['close_price'] = 0
-                dict_price[index]['pnl'] = 0
-                index+=1
-            df = pd.DataFrame.from_dict(dict_price, orient='index')
-            df.to_excel(excel_file_path)
-            # x = threading.Thread(target=get_commision, args=(open_future, um_futures_client, pair))
-            # x.start()
+    #     usdt = 600
+    #     temp = True
+    
+    if enable_new_order:
+        enable_new_order = False
+        time_get_gap = time.strftime("%Y-%m-%d %H:%M:%S")
+        print("\n-----",time_get_gap, "-----")
+        quantity_ft = round((usdt)/askPrice, precision_ft)
+        msg = f"{time_get_gap} create new order {index} price: {askPrice}"
+        requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={msg}")
+        try:
+            open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
+        except ClientError as error:
+            print(error.error_message)
+            requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={error.error_message}")
+        mark_ft_at_this_gap = askPrice
+        dict_price[index] = {}
+        dict_price[index]["time"] = time_get_gap
+        dict_price[index]["askPrice"] = mark_ft_at_this_gap
+        dict_price[index]["highest_price"] = mark_ft_at_this_gap
+        dict_price[index]["highest_rate"] = 100
+        dict_price[index]['break'] = False
+        dict_price[index]['low_boundary'] = mark_ft_at_this_gap * cut_loss
+        dict_price[index]['high_boundary'] = mark_ft_at_this_gap * take_profit
+        dict_price[index]['orderId'] = open_future["orderId"]
+        dict_price[index]['filled'] = False
+        dict_price[index]['close_price'] = 0
+        dict_price[index]['pnl'] = 0
+        index+=1
+    df = pd.DataFrame.from_dict(dict_price, orient='index')
+    df.to_excel(excel_file_path)
+
     if indexz % 400 == 0:
-        print("Update:", time.strftime("%Y-%m-%d %H:%M:%S"),"price:", askPrice, ", enable:", enable_new_order, ", minutes to next:", round(time_to_new_order/60, 1)) 
+        print("Update:", time.strftime("%Y-%m-%d %H:%M:%S"),"price:", askPrice, ", enable:", enable_new_order) 
         try:
             df = pd.DataFrame.from_dict(dict_price, orient='index')
             md = parse_df_markdown(df)
-            md += f"\n{askPrice}, {round(time_to_new_order/60, 1)}, {enable_new_order}"
             requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text={md}&parse_mode=Markdown")
         except (requests.exceptions.SSLError, KeyError) as e:
             print("post markdown error")

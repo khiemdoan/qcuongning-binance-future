@@ -4,15 +4,25 @@ import sys
 import time, math
 from binance_ft.um_futures import UMFutures
 from helper import get_commision, get_precision, get_status_pos, key, secret
+import argparse
 
+parser = argparse.ArgumentParser(description='A simple example script to demonstrate argparse')
+parser.add_argument('pair', type=str, default= "ORDIUSDC",help='The name of the pair to process')
+parser.add_argument("--vol", type=int, default=300)
+parser.add_argument("--low", type=float, default=0.99)
+
+parser.add_argument("--s", action='store_true')
+args = parser.parse_args()
 
 if __name__ == "__main__":
     um_futures_client = UMFutures(key=key, secret=secret)
 
     # um_futures_client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
 
-    usdt = 500
-    pair = sys.argv[1]
+    usdt = args.vol
+
+
+    pair = args.pair
     print("******", pair, "*******")
 
     precision_ft = get_precision(pair, um_futures_client)
@@ -22,31 +32,27 @@ if __name__ == "__main__":
     # bid_price = float(um_futures_client.book_ticker(pair)['bidPrice'])
     askPrice = float(um_futures_client.book_ticker(pair)['askPrice'])
 
-    
-
 
 
     quantity_ft = round((usdt)/askPrice, precision_ft)
     print("askPrice:", round(askPrice,4), "quantity: ", quantity_ft)
 
     a,b,c  = get_status_pos(pair, um_futures_client)
-    if c != 0:
+    if not args.s and c != 0:
         usdt_open = usdt
         commis = usdt * 0.0005
         coin_open = c
         mean_price = a
         all_pnl = b
         coin_open = round(coin_open, precision_ft)
-
         print(f"already set a open at {a}, with {coin_open} {pair}, pnl {b}")
     else:
         open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
         # open_future = um_futures_client.new_order(symbol=pair, side="SELL", type="MARKET", quantity=quantity_ft)        
         commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(open_future['orderId'], um_futures_client, pair)
-        
         coin_open = round(coin_open, precision_ft)
 
-    low_ratio = 0.99
+    low_ratio = args.low
     high_ratio = 1.05
 
     
