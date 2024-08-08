@@ -1,5 +1,8 @@
 key="7NvUEUX4tnzOja5KQ99gmUG37DQOV9oelvz1akWAr2Zts9X57djRMwbvfgjQoykp"
 secret="X9CWCXNsdypjEU8Q0AQaoaqPrcnaX4wpDe5KVxsAfThkVJJAvufiGJ3tb95QqnQC"
+
+key_test = "c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b"
+secret_test = "be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403"
 # key api test2
 import sys
 import time, math
@@ -52,9 +55,11 @@ def get_commision(ft_order_id, um_futures_client, pair):
 
 def get_precision(pair, um_futures_client):
     future_info = um_futures_client.exchange_info()['symbols']
-    kk = [i['filters'] for i in future_info if i['symbol'] == pair][0][1]
-    precision_ft = int(-math.log10(float(kk['minQty'])))
-    return precision_ft
+    kk = [i['filters'] for i in future_info if i['symbol'] == pair][0]
+    precision_qlt = int(-math.log10(float(kk[1]['minQty'])))
+    precision_price = int(-math.log10(float(kk[0]['minPrice'])))
+
+    return precision_qlt, precision_price
 
 def get_status_pos(pair, um_futures_client):
     list_risks = um_futures_client.get_position_risk(recvWindow=6000)
