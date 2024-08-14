@@ -59,8 +59,6 @@ def add_to_dict():
                     float(item[5]) #V
                 ])
             ohlc = np.array(ohlc)
-            # print(ohlc)
-            # print(ohlc[-1][3])
             if current_kline_time>kline_start_time:
                 x_array = ohlc[-31:-1]
                 order_price = ohlc[-2][3] # close price of last klines
@@ -71,26 +69,31 @@ def add_to_dict():
                 x_array = ohlc[-30:]
                 order_price = ohlc[-1][3] # close price of last klines
 
-            x_array[:,-1] = x_array[:,-1]/20000
+
+            min_vol = np.min(x_array[:,-1])
+            x_array[:,-1] = x_array[:,-1]/min_vol
             min_price = np.min(x_array[:,:4])
             max_price = np.max(x_array[:,:4])
             x_array[:,:4] = (x_array[:,:4] - min_price) / (max_price - min_price)
+
+
             x_array = np.array([x_array]).reshape(1, -1)
+            # print(x_array.shape)
             dtest = xgb.DMatrix(x_array)
             y_pred_prob = bst.predict(dtest)
-            prob = round(np.random.rand(), 2)
-            print(Fore.RED+"[add_to_dict] y_pred_prob=", y_pred_prob, ", prob=", prob)
+
+            print(Fore.RED+"[add_to_dict] y_pred_prob=", y_pred_prob)
+            post_tele("add_to_dict: y pred prob = " + str(y_pred_prob))
             with lock:
-                if prob > 0.8:  # prob to choose kline
-                    if y_pred_prob >= 0.5:
-                        quantity_ft = round((usdt)/order_price, precision_ft)
-                        try:
-                            open_future = client.new_order(symbol=symbol, side="SELL", type="MARKET", quantity=quantity_ft)
-                        except ClientError as error:
-                            print(error.error_message)
-                            post_tele(error.error_message)
-                        dict_price = update_dict(dict_price, open_future, order_price, index, cut_loss, take_profit)
-                        index+=1
+                if int(y_pred_prob) == 1:
+                    quantity_ft = round((usdt)/order_price, precision_ft)
+                    try:
+                        open_future = client.new_order(symbol=symbol, side="SELL", type="MARKET", quantity=quantity_ft)
+                    except ClientError as error:
+                        print(Fore.RED + error.error_message)
+                        post_tele(error.error_message)
+                    dict_price = update_dict(dict_price, open_future, order_price, index, cut_loss, take_profit)
+                    index+=1
 
         else:
             time.sleep(2)
@@ -120,6 +123,12 @@ def count_dict_items():
                         dict_price[key]['filled'] = True
                         dict_price[key]['coin'] = round(coin_open, precision_ft)
                         dict_price[key]['commis'] = round(commis,2)
+                        dict_price[key]["askPrice"] = mean_price
+                        dict_price[key]["highest_rate"] = 100
+                        dict_price[key]['break'] = False
+                        dict_price[key]['low_boundary'] = mean_price * take_profit
+                        dict_price[key]['high_boundary'] = mean_price * cut_loss
+
                         msg += f"*open* id: {key} at:{mean_price:.3f}, low:{dict_price[key]['low_boundary']:.2f}, high:{dict_price[key]['high_boundary']:.2f}\n"
                     elif res_query['status'] == "CANCELED":
                         dict_price[key]['filled'] = "CANCELED"
@@ -167,10 +176,10 @@ if __name__ == "__main__":
     client = UMFutures(key=api_key, secret=api_secret)
 
     bst = xgb.Booster()
-    bst.load_model('xgboost_model.json')
+    bst.load_model('xgboost_model_ORDI_15m_15k_first_maxdepth20_3class.json')
     cut_loss, take_profit = 1.03, 0.97
     interval = '15m'
-    usdt = 100
+    usdt = 1000
     precision_ft, precision_price = get_precision(symbol, client)
 
 
