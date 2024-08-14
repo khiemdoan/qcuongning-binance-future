@@ -47,10 +47,10 @@ def get_commision(ft_order_id, um_futures_client, pair):
     all_pnl = sum([float(res['realizedPnl']) for res in res_ft_open])
 
     mean_price = all_spend/all_coin
-    if res_ft_open[0]['maker']:
-        print("--> this order is maker")
-    else:
-        print("--> this order is taker")
+    # if res_ft_open[0]['maker']:
+    #     print("--> this order is maker")
+    # else:
+    #     print("--> this order is taker")
     return commision_open_future, all_spend, all_coin, mean_price, all_pnl
 
 def get_precision(pair, um_futures_client):
