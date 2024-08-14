@@ -13,7 +13,7 @@ import threading
 from binance_ft.error import ClientError
 from colorama import Fore, Style
 from binance.spot import Spot
-
+import time
 symbol = 'ORDIUSDT'
 
 date = time.strftime("%Y-%m")
@@ -70,7 +70,7 @@ def add_to_dict():
                 x_array = ohlc[-30:]
                 order_price = ohlc[-1][3] # close price of last klines
 
-
+            start = time.time()
             min_vol = np.min(x_array[:,-1])
             x_array[:,-1] = x_array[:,-1]/min_vol
             min_price = np.min(x_array[:,:4])
@@ -82,9 +82,9 @@ def add_to_dict():
             # print(x_array.shape)
             dtest = xgb.DMatrix(x_array)
             y_pred_prob = bst.predict(dtest)[0]
-
+            duration = time.time()-start
             print(Fore.RED+"[add_to_dict] y_pred_prob=", y_pred_prob)
-            post_tele("add_to_dict: y pred prob = " + str(y_pred_prob))
+            post_tele(f"add_to_dict: y pred prob = {y_pred_prob}, in {duration:.3f}s")
             with lock:
                 if int(y_pred_prob) == 1:
                     quantity_ft = round((usdt)/order_price, precision_ft)
@@ -158,7 +158,7 @@ def count_dict_items():
             df = pd.DataFrame.from_dict(dict_price, orient='index')
             df.to_excel(excel_file_path)
 
-            if indexz % 500 == 5:
+            if indexz % 500 == 5 and len(dict_price):
                 print(Fore.GREEN + "[count_dict_items] Update:", time.strftime("%Y-%m-%d %H:%M:%S"),"price:", askPrice) 
                 try:
                     df = pd.DataFrame.from_dict(dict_price, orient='index')
