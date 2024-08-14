@@ -12,6 +12,7 @@ from auto_order_manual import post_tele, update_dict, parse_df_markdown
 import threading
 from binance_ft.error import ClientError
 from colorama import Fore, Style
+from binance.spot import Spot
 
 symbol = 'ORDIUSDT'
 
@@ -31,7 +32,7 @@ else:
     dict_price = {}
 
 def get_latest_kline_start_time(symbol, interval, limit=3):
-    klines = client.klines(symbol=symbol, interval=interval, limit=limit)
+    klines = client_spot.klines(symbol=symbol, interval=interval, limit=limit)
     kline_start_time = int(klines[-1][0])
     return datetime.fromtimestamp(kline_start_time / 1000), klines
 
@@ -80,7 +81,7 @@ def add_to_dict():
             x_array = np.array([x_array]).reshape(1, -1)
             # print(x_array.shape)
             dtest = xgb.DMatrix(x_array)
-            y_pred_prob = bst.predict(dtest)
+            y_pred_prob = bst.predict(dtest)[0]
 
             print(Fore.RED+"[add_to_dict] y_pred_prob=", y_pred_prob)
             post_tele("add_to_dict: y pred prob = " + str(y_pred_prob))
@@ -157,7 +158,7 @@ def count_dict_items():
             df = pd.DataFrame.from_dict(dict_price, orient='index')
             df.to_excel(excel_file_path)
 
-            if indexz % 500 == 0:
+            if indexz % 500 == 5:
                 print(Fore.GREEN + "[count_dict_items] Update:", time.strftime("%Y-%m-%d %H:%M:%S"),"price:", askPrice) 
                 try:
                     df = pd.DataFrame.from_dict(dict_price, orient='index')
@@ -173,6 +174,7 @@ if __name__ == "__main__":
     api_key="7NvUEUX4tnzOja5KQ99gmUG37DQOV9oelvz1akWAr2Zts9X57djRMwbvfgjQoykp"
     api_secret="X9CWCXNsdypjEU8Q0AQaoaqPrcnaX4wpDe5KVxsAfThkVJJAvufiGJ3tb95QqnQC"
     # client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
+    client_spot = Spot()
     client = UMFutures(key=api_key, secret=api_secret)
 
     bst = xgb.Booster()
