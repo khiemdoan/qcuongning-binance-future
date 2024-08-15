@@ -145,11 +145,12 @@ def count_dict_items():
                 if dict_price[key]['filled'] is True:
                     if dict_price[key]['break']:
                         continue
-                    dict_price[key]['pnl'] = dict_price[key]['coin'] * (dict_price[key]['askPrice'] - askPrice)
+                    dict_price[key]['pnl'] = round(dict_price[key]['coin'] * (dict_price[key]['askPrice'] - askPrice),4)
                     if askPrice > dict_price[key]['highest_price']:
                         dict_price[key]['highest_price'] = askPrice
                         dict_price[key]["highest_rate"]  = round(askPrice/dict_price[key]["askPrice"] *100, 1)
                     if askPrice < dict_price[key]['low_boundary'] or askPrice >= dict_price[key]['high_boundary'] or over_time(dict_price[key]['time']):
+                        print(over_time(dict_price[key]['time']), "overtime")
                         close_future = client.new_order(symbol=symbol, side="BUY", type="MARKET", quantity=dict_price[key]['coin'])
                         commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(close_future['orderId'], client, symbol)
                         print(Fore.GREEN + "[count_dict_items]", time.strftime("%Y-%m-%d %H:%M:%S"), f"Close order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")    
