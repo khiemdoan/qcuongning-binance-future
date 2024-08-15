@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 import requests
 from binance_ft.um_futures import UMFutures
-from helper import get_commision, get_precision, get_status_pos, key, secret, xlsx_to_nested_dict
+from helper import get_commision, get_precision, get_status_pos, key, secret
 from datetime import datetime, timedelta
 import numpy as np
 import xgboost as xgb
@@ -14,15 +14,21 @@ from binance_ft.error import ClientError
 from colorama import Fore, Style
 from binance.spot import Spot
 import time
+
+def over_time(time_string, time_format="%Y-%m-%d %H:%M:%S"):
+    given_time = datetime.strptime(time_string, time_format)
+    now = datetime.now()
+    time_difference = now - given_time
+    return time_difference > timedelta(minutes=150)
 symbol = 'ORDIUSDT'
 
 date = time.strftime("%Y-%m")
-excel_file_path = f'{symbol}_{date}.xlsx'
+excel_file_path = f'{symbol}_{date}.csv'
 dict_price = {}
 lock = threading.Lock()
 
 if os.path.exists(excel_file_path):
-    df = pd.read_excel(excel_file_path, header=0, index_col=0)
+    df = pd.read_csv(excel_file_path, header=0, index_col=0)
     dict_price = df.to_dict('index')
     if  len(dict_price):
         print(f"load previous {excel_file_path} contain {len(dict_price)} with {len(df[df['break']==True])} break and {len(df[df['filled']==True])} filled")
@@ -116,23 +122,24 @@ def count_dict_items():
                 if not dict_price[key]['filled']:
                     try:
                         res_query = client.query_order(symbol=symbol, orderId=dict_price[key]['orderId'], recvWindow=6000)
-                    except ClientError:
+                    
+                        if res_query['status'] == "FILLED":
+                            commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(dict_price[key]['orderId'], client, symbol)
+                            print(Fore.GREEN + "[count_dict_items]", time.strftime("%Y-%m-%d %H:%M:%S"), f"Open order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")
+                            dict_price[key]['filled'] = True
+                            dict_price[key]['coin'] = round(coin_open, precision_ft)
+                            dict_price[key]['commis'] = round(commis,2)
+                            dict_price[key]["askPrice"] = mean_price
+                            dict_price[key]["highest_rate"] = 100
+                            dict_price[key]['break'] = False
+                            dict_price[key]['low_boundary'] = mean_price * take_profit
+                            dict_price[key]['high_boundary'] = mean_price * cut_loss
+                            msg += f"*open* id: {key} at:{mean_price:.3f}, low:{dict_price[key]['low_boundary']:.2f}, high:{dict_price[key]['high_boundary']:.2f}\n"
+                        elif res_query['status'] == "CANCELED":
+                            dict_price[key]['filled'] = "CANCELED"
+                    except ClientError as err:
                         print(key, dict_price[key])
-                    if res_query['status'] == "FILLED":
-                        commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(dict_price[key]['orderId'], client, symbol)
-                        print(Fore.GREEN + "[count_dict_items]", time.strftime("%Y-%m-%d %H:%M:%S"), f"Open order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")
-                        dict_price[key]['filled'] = True
-                        dict_price[key]['coin'] = round(coin_open, precision_ft)
-                        dict_price[key]['commis'] = round(commis,2)
-                        dict_price[key]["askPrice"] = mean_price
-                        dict_price[key]["highest_rate"] = 100
-                        dict_price[key]['break'] = False
-                        dict_price[key]['low_boundary'] = mean_price * take_profit
-                        dict_price[key]['high_boundary'] = mean_price * cut_loss
-
-                        msg += f"*open* id: {key} at:{mean_price:.3f}, low:{dict_price[key]['low_boundary']:.2f}, high:{dict_price[key]['high_boundary']:.2f}\n"
-                    elif res_query['status'] == "CANCELED":
-                        dict_price[key]['filled'] = "CANCELED"
+                        post_tele(err.error_message)
 
 
                 if dict_price[key]['filled'] is True:
@@ -142,7 +149,7 @@ def count_dict_items():
                     if askPrice > dict_price[key]['highest_price']:
                         dict_price[key]['highest_price'] = askPrice
                         dict_price[key]["highest_rate"]  = round(askPrice/dict_price[key]["askPrice"] *100, 1)
-                    if askPrice < dict_price[key]['low_boundary'] or askPrice >= dict_price[key]['high_boundary']:
+                    if askPrice < dict_price[key]['low_boundary'] or askPrice >= dict_price[key]['high_boundary'] or over_time(dict_price[key]['time']):
                         close_future = client.new_order(symbol=symbol, side="BUY", type="MARKET", quantity=dict_price[key]['coin'])
                         commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(close_future['orderId'], client, symbol)
                         print(Fore.GREEN + "[count_dict_items]", time.strftime("%Y-%m-%d %H:%M:%S"), f"Close order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")    
@@ -152,11 +159,14 @@ def count_dict_items():
                         dict_price[key]['pnl'] = coin_open * (dict_price[key]["askPrice"] - mean_price) - dict_price[key]['commis']
                         dict_price[key]['break'] = True
                         msg += f"*close* id: {key}, pnl: {dict_price[key]['pnl']:.2f}, price:{mean_price:.2f}\n"
+
+                    
                         
             if len(msg) > 0:
                 post_tele(msg)
             df = pd.DataFrame.from_dict(dict_price, orient='index')
-            df.to_excel(excel_file_path)
+            # df.to_excel(excel_file_path)
+            df.to_csv(excel_file_path)
 
             if indexz % 500 == 5 and len(dict_price):
                 print(Fore.GREEN + "[count_dict_items] Update:", time.strftime("%Y-%m-%d %H:%M:%S"),"price:", askPrice) 
@@ -171,8 +181,8 @@ def count_dict_items():
     
 if __name__ == "__main__":
     # Initialize the Binance client
-    api_key="7NvUEUX4tnzOja5KQ99gmUG37DQOV9oelvz1akWAr2Zts9X57djRMwbvfgjQoykp"
-    api_secret="X9CWCXNsdypjEU8Q0AQaoaqPrcnaX4wpDe5KVxsAfThkVJJAvufiGJ3tb95QqnQC"
+    api_key=key
+    api_secret=secret
     # client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
     client_spot = Spot()
     client = UMFutures(key=api_key, secret=api_secret)
