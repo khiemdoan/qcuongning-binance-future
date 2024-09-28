@@ -14,7 +14,7 @@ import threading
 from binance_ft.error import ClientError
 from colorama import Fore, Style
 from binance.spot import Spot
-
+from xgboost_order import is_pin_bar, is_decrease
 
 
 if __name__ == "__main__":
@@ -48,15 +48,21 @@ if __name__ == "__main__":
     
     ohlc = np.array(ohlc)
     x_array = ohlc[-31:-1]
+    x_array_cp = x_array.copy()
+
+    
 
     min_vol = np.min(x_array[:,-1])
     x_array[:,-1] = x_array[:,-1]/min_vol
     min_price = np.min(x_array[:,:4])
     max_price = np.max(x_array[:,:4])
     x_array[:,:4] = (x_array[:,:4] - min_price) / (max_price - min_price)
+    manual_condition = is_decrease(x_array_cp[-1]) or is_decrease(x_array_cp[-2]) or is_pin_bar(x_array_cp[-1])   # it nhat 1 nen do trong 2 nen truoc do
+    print(is_decrease(x_array_cp[-1]))
+    print(is_decrease(x_array_cp[-2]))
 
 
     x_array = np.array([x_array]).reshape(1, -1)
     dtest = xgb.DMatrix(x_array)
     y_pred_prob = bst.predict(dtest)
-    print(y_pred_prob)
+    print(y_pred_prob, manual_condition)

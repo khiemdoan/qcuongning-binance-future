@@ -9,6 +9,93 @@ import time, math
 import binance_ft
 from binance_ft.um_futures import UMFutures
 import openpyxl
+import requests
+from datetime import datetime, timedelta
+
+def over_time(time_string, time_format="%Y-%m-%d %H:%M:%S"):
+    given_time = datetime.strptime(time_string, time_format)
+    now = datetime.now()
+    time_difference = now - given_time
+    return time_difference > timedelta(minutes=150)
+def post_tele(msg):
+    try:
+        BOT_TOKEN = '6665726347:AAGJ60eAiJWsurJVf1YrIALjzAWJbrvrZzk'
+        CHAT_ID = '942157886'
+
+
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+        data = {
+            "chat_id": CHAT_ID,
+            "text": msg,
+            "parse_mode":"Markdown"
+        }
+
+        response = requests.post(url, data=data)
+    except requests.exceptions.SSLError as e:
+        print("post_tele", e)
+
+def update_tele(last_command_time, enable_new_order, enable_pnl, indexz, dict_price, askPrice):
+    BOT_TOKEN = '6665726347:AAGJ60eAiJWsurJVf1YrIALjzAWJbrvrZzk'
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+    response = requests.get(url)
+    data = response.json()
+    
+    if "result" in data and len(data["result"]) > 0:
+        cmd = data["result"][-1]["message"]["text"]
+        time = data['result'][-1]['message']['date']
+        if time > last_command_time:
+            last_command_time = time
+            print(f"Chat:{datetime.fromtimestamp(time)}: {cmd}")
+            if cmd == "hi":
+                post_tele("hello!!!")
+            elif cmd == "price":
+                post_tele(str(askPrice))
+            elif cmd == "off":
+                enable_new_order = False
+                post_tele("turn off")
+            elif cmd == "on":
+                enable_new_order = True
+                post_tele("turn on")
+            elif cmd == "pnl":
+                enable_pnl = True
+                indexz = 498
+                post_tele("trigger pnl: "+str(enable_pnl))
+            elif cmd.startswith("rm"):
+                idrm = cmd.split(" ")
+                if len(idrm):
+                    id_rm = int(idrm[1])
+                    post_tele(f"remove {id_rm}")
+                    if id_rm in dict_price:
+                        dict_price[id_rm]['break'] = True
+                    else:
+                        post_tele(f"not found {id_rm}")
+    return last_command_time, enable_new_order, enable_pnl, indexz, dict_price
+
+def is_pin_bar(candle):
+    open_price = candle[0]
+    high_price = candle[1]
+    low_price = candle[2]
+
+    close_price = candle[3]
+    body_size = abs(close_price - open_price)
+    upper_wick_size = high_price - max(open_price, close_price)
+    candle_range = high_price - low_price
+    
+    # Define Pin Bar conditions
+    long_tail = (upper_wick_size > 8 * body_size)
+    small_body = body_size <= 0.2 * candle_range
+    
+    return long_tail and small_body
+
+def is_decrease(candle):
+    open_price = candle[0]
+    high_price = candle[1]
+    low_price = candle[2]
+
+    close_price = candle[3]
+    return close_price < open_price
 
 def xlsx_to_nested_dict(file_path):
     workbook = openpyxl.load_workbook(file_path)

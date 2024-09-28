@@ -8,3 +8,6 @@ __pycache__
 .DS_Store
 /data/
 *.xlsx
+/data_his
+*.csv
+*.jpeg

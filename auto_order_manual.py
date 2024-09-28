@@ -5,7 +5,7 @@ import pandas as pd
 from binance_ft.um_futures import UMFutures
 import time
 import time, sys
-from helper import get_commision, get_precision, get_status_pos, key, secret, xlsx_to_nested_dict, key_test, secret_test
+from helper import get_commision, get_precision, get_status_pos, key, secret, post_tele, key_test, secret_test
 from binance_ft.error import ClientError
 import requests
 import argparse
@@ -18,7 +18,7 @@ def parse_df_markdown(df):
     markdown_text = df_show.to_markdown()
     return markdown_text
 
-def update_dict(dict_price, order, price, index, cut_loss, take_profit):
+def update_dict(dict_price, order, price, index, cut_loss, take_profit, manual=False):
     if "time" in order:
         
         time_get_gap = datetime.datetime.fromtimestamp(order['time'] / 1000).strftime("%Y-%m-%d %H:%M:%S")
@@ -36,19 +36,54 @@ def update_dict(dict_price, order, price, index, cut_loss, take_profit):
     dict_price[index]['low_boundary'] = price * take_profit
     dict_price[index]['high_boundary'] = price * cut_loss
     dict_price[index]['orderId'] = order["orderId"]
-    dict_price[index]['filled'] = False
+    dict_price[index]['filled'] = "F"
     dict_price[index]['close_price'] = 0
     dict_price[index]['pnl'] = 0
+    dict_price[index]['coin'] = 0
+    dict_price[index]['commis'] = 0
+    dict_price[index]['manual'] = manual
+
+
     return dict_price
 
-def post_tele(msg):
-    try:
-        link_api = "https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?"
-        chat_id = "-895385211"
-        requests.post(f"{link_api}chat_id={chat_id}&text={msg}&parse_mode=Markdown")
-    except requests.exceptions.SSLError as e:
-        print("post_tele", e)
 
+def update_tele():
+    global last_command_time, enable_new_order, enable_pnl, indexz, dict_price
+    BOT_TOKEN = '6665726347:AAGJ60eAiJWsurJVf1YrIALjzAWJbrvrZzk'
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+    response = requests.get(url)
+    data = response.json()
+    
+    if "result" in data and len(data["result"]) > 0:
+        cmd = data["result"][-1]["message"]["text"]
+        time = data['result'][-1]['message']['date']
+        if time > last_command_time:
+            last_command_time = time
+            print(f"Chat:{datetime.datetime.fromtimestamp(time)}: {cmd}")
+            if cmd == "hi":
+                post_tele("hello!!!")
+            elif cmd == "Price":
+                post_tele(str(askPrice))
+            elif cmd == "off":
+                enable_new_order = False
+                post_tele("turn off")
+            elif cmd == "on":
+                enable_new_order = True
+                post_tele("turn on")
+            elif cmd == "pnl":
+                enable_pnl = not enable_pnl
+                indexz = 497
+                post_tele("trigger pnl: "+str(enable_pnl))
+            elif cmd.startswith("rm"):
+                idrm = cmd.split(" ")
+                if len(idrm):
+                    id_rm = int(idrm[1])
+                    post_tele(f"remove {id_rm}")
+                    if id_rm in dict_price:
+                        dict_price[id_rm]['break'] = True
+                    else:
+                        post_tele(f"not found {id_rm}")
 
 
 if __name__ == "__main__":
@@ -57,6 +92,8 @@ if __name__ == "__main__":
     parser.add_argument("--vol", type=int, default=300)
     parser.add_argument("--en", action='store_true')
     parser.add_argument("--test", action='store_true')
+    last_command_time = int(time.time())
+    print("start in", datetime.datetime.fromtimestamp(last_command_time))
 
 
     args = parser.parse_args()
@@ -74,64 +111,60 @@ if __name__ == "__main__":
     enable_new_order = args.en
     precision_ft, precision_price = get_precision(pair, client)
     df = None
+    reply = True
+    enable_pnl = True
 
     # client.cancel_open_orders(symbol=pair, recvWindow=2000)
 
     date = time.strftime("%Y-%m")
-    excel_file_path = f'{pair}_{cut_loss}_0.4_{date}.xlsx'
+    excel_file_path = f'{pair}_manual_{date}.csv'
     if os.path.exists(excel_file_path):
-        df = pd.read_excel(excel_file_path, header=0, index_col=0)
+        df = pd.read_csv(excel_file_path, header=0, index_col=0)
         dict_price = df.to_dict('index')
-        print(f"load previous {excel_file_path} contain {len(dict_price)} with {len(df[df['break']==True])} break and {len(df[df['filled']==True])} filled")
-        index = len(dict_price)
+        if len(dict_price):
+            print(f"load previous {excel_file_path} contain {len(dict_price)} with {len(df[df['break']==True])} break and {len(df[df['filled']=='True'])} filled")
+            # import ipdb
+            # ipdb.set_trace()
+            # print(dict_price)
 
     else:
-        # try:
-        #     requests.post(f"https://api.telegram.org/bot5910304360:AAGW_t3F1x9cATh7d6VUDCquJFX0dPC2W-M/sendMessage?chat_id=-895385211&text=-----new-----")
-        # except requests.exceptions.ConnectionError as e:
-        #     print(e)
-        index = 0
+        post_tele("----new----")
+        
         dict_price = {}
+    index = len(dict_price)
+    order_ids = [value['orderId'] for value in dict_price.values()]
+    indexz = 490
+    # print("start !!!", index, order_ids)
 
-        indexz = 0
-        reply = True
-        price = 0
-        temp = False
-        open_oder_manual = []
-        order_ids = [value['orderId'] for value in dict_price.values()]
 
     while True:
+        update_tele()
         indexz += 1
-        bidPrice = float(client.book_ticker(pair)['bidPrice'])
-
-        askPrice = float(client.book_ticker(pair)['askPrice'])  # > mark price
-
-        # check balance to trigger service remotely
-        try:
-            response = client.account(recvWindow=6000)
-            for assett in response['assets']:
-                if assett['asset'] == "USDT":
-                    if float(assett['walletBalance']) > 0 and not reply:
-                        reply = True
-                        enable_new_order = True
-                        post_tele(f"alive-enable_new_order-{enable_new_order}")
-                    elif float(assett['walletBalance']) ==  0:
-                        reply = False
-        except ClientError as err:
-            pass
-            print("get acount error: ", err.error_message)
+        askPrice = float(client.book_ticker(pair)['askPrice'])  # > mark price        
 
         # check open order by smartphone to trigger service
         open_orders = [i for i in client.get_orders() if i['symbol'] == pair]
         for open in open_orders:
             if open['side'] == "SELL" and open['orderId'] not in order_ids:
-                dict_price = update_dict(dict_price, open, round(float(open['price']), precision_price), index)
+                dict_price = update_dict(dict_price, open, round(float(open['price']), precision_price), index, cut_loss, take_profit)
                 index += 1
                 order_ids = [value['orderId'] for value in dict_price.values()]
 
+        if indexz % 50 == 0:
+            res = client.get_all_orders(pair)[-1]
+            if res['side'] == "SELL" and res['orderId'] not in order_ids and res['time']/1000 > last_command_time:
+                print("!!!update order id", res['orderId'], "in", datetime.datetime.fromtimestamp(res['time']/1000))
+                dict_price = update_dict(dict_price, res, round(float(res['price']), precision_price), index, cut_loss, take_profit)
+                index+=1
+                order_ids = [value['orderId'] for value in dict_price.values()]
+
+
+
+
         msg = ""
         for key in dict_price.keys():
-            if not dict_price[key]['filled']:
+
+            if dict_price[key]['filled'] != "True":
                 try:
                     res_query = client.query_order(symbol=pair, orderId=dict_price[key]['orderId'], recvWindow=6000)
                 except ClientError:
@@ -139,7 +172,7 @@ if __name__ == "__main__":
                 if res_query['status'] == "FILLED":
                     commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(dict_price[key]['orderId'], client, pair)
                     print(time.strftime("%Y-%m-%d %H:%M:%S"), f"Open order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")
-                    dict_price[key]['filled'] = True
+                    dict_price[key]['filled'] = "True"
                     dict_price[key]['coin'] = round(coin_open, precision_ft)
                     dict_price[key]['commis'] = round(commis,2)
                     msg += f"*open* id: {key} at:{mean_price:.3f}, low:{dict_price[key]['low_boundary']:.2f}, high:{dict_price[key]['high_boundary']:.2f}\n"
@@ -148,10 +181,11 @@ if __name__ == "__main__":
 
 
 
-            if dict_price[key]['filled'] is True:
+            if dict_price[key]['filled'] == "True":
+
                 if dict_price[key]['break']:
                     continue
-                dict_price[key]['pnl'] = dict_price[key]['coin'] * (dict_price[key]['askPrice'] - askPrice)
+                dict_price[key]['pnl'] = round(dict_price[key]['coin'] * (dict_price[key]['askPrice'] - askPrice),3)
                 if askPrice > dict_price[key]['highest_price']:
                     dict_price[key]['highest_price'] = askPrice
                     dict_price[key]["highest_rate"]  = round(askPrice/dict_price[key]["askPrice"] *100, 1)
@@ -162,7 +196,7 @@ if __name__ == "__main__":
                     dict_price[key]['commis'] += round(commis,2)
                     dict_price[key]['close_price'] = mean_price
 
-                    dict_price[key]['pnl'] = coin_open * (dict_price[key]["askPrice"] - mean_price) - dict_price[key]['commis']
+                    dict_price[key]['pnl'] = round(coin_open * (dict_price[key]["askPrice"] - mean_price) - dict_price[key]['commis'], 3)
                     dict_price[key]['break'] = True
                     msg += f"*close* id: {key}, pnl: {dict_price[key]['pnl']:.2f}, price:{mean_price:.2f}\n"
                     
@@ -180,21 +214,20 @@ if __name__ == "__main__":
             except ClientError as error:
                 print(error.error_message)
                 post_tele(error.error_message)
-            dict_price = update_dict(dict_price, open_future, askPrice, index)
+            dict_price = update_dict(dict_price, open_future, askPrice, index, cut_loss, take_profit)
             index+=1
             order_ids = [value['orderId'] for value in dict_price.values()]
-
         df = pd.DataFrame.from_dict(dict_price, orient='index')
-        df.to_excel(excel_file_path)
+        df.to_csv(excel_file_path)
 
-        if indexz % 500 == 0:
+        if indexz % 500 == 0 and enable_pnl:
             print("Update:", time.strftime("%Y-%m-%d %H:%M:%S"),"price:", askPrice, ", enable:", enable_new_order) 
             try:
                 df = pd.DataFrame.from_dict(dict_price, orient='index')
                 md = parse_df_markdown(df)
                 post_tele(md)
             except (requests.exceptions.SSLError, KeyError) as e:
-                print("post markdown error")
+                print("post markdown error", e)
         time.sleep(1)
         
 
