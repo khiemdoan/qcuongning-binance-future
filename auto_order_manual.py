@@ -26,6 +26,7 @@ def update_dict(dict_price, order, price, index, cut_loss, take_profit, manual=F
         time_get_gap = datetime.datetime.fromtimestamp(order['updateTime'] / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
     msg = f"{time_get_gap} create new order {index} price: {price}"
+    print(msg)
     post_tele(msg)
     dict_price[index] = {}
     dict_price[index]["time"] = time_get_gap

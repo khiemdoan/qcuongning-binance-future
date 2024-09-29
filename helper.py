@@ -6,11 +6,14 @@ secret_test = "be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403"
 # key api test2
 import sys
 import time, math
+
+import numpy as np
 import binance_ft
 from binance_ft.um_futures import UMFutures
 import openpyxl
 import requests
 from datetime import datetime, timedelta
+import pandas as pd
 
 def over_time(time_string, time_format="%Y-%m-%d %H:%M:%S"):
     given_time = datetime.strptime(time_string, time_format)
@@ -158,7 +161,97 @@ def get_status_pos(pair, um_futures_client):
             return mean_price, pnl, coin_num
     else:
         return 0, 0, 0
+    
 
+def calculate_rsi_with_ema(x_array, window: int = 14):
+    data = x_array[:, 3]
+    data = pd.Series(data)
+
+    delta = data.diff()
+
+    # Bước 2: Tách mức tăng (gain) và mức giảm (loss)
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    # Bước 3: Tính trung bình động hàm mũ (EMA) cho gain và loss
+    avg_gain = gain.ewm(span=window, min_periods=window).mean()
+    avg_loss = loss.ewm(span=window, min_periods=window).mean()
+
+    # Bước 4: Tính RS và RSI
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+
+    return np.array(rsi)
+# Tính RSI với trung bình động hàm mũ (EMA)
+# rsi_ema = calculate_rsi_with_ema(data, window=14)
+# print(rsi_ema)
+def calculate_rsi(x_array, window: int = 14) -> pd.Series:
+    data = x_array[:, 3]
+    data = pd.Series(data)
+    delta = data.diff()
+    
+    # Bước 2: Tách riêng mức tăng (gain) và mức giảm (loss)
+    gain = delta.where(delta > 0, 0)  # Nếu thay đổi dương thì giữ nguyên, ngược lại bằng 0
+    loss = -delta.where(delta < 0, 0)  # Nếu thay đổi âm thì lấy giá trị tuyệt đối, ngược lại bằng 0
+
+    # Bước 3: Tính trung bình động của mức tăng và mức giảm trong `window` ngày
+    avg_gain = gain.rolling(window=window, min_periods=1).mean()
+    avg_loss = loss.rolling(window=window, min_periods=1).mean()
+
+    # Bước 4: Tính Relative Strength (RS)
+    rs = avg_gain / avg_loss
+
+    # Bước 5: Tính RSI
+    rsi = 100 - (100 / (1 + rs))
+
+    return np.array(rsi)
+
+
+def generate_date_list(start_date_str, end_date_str, interval_days=4):
+    # Convert string inputs to dat|etime objects
+    start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+    end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+    
+    # Generate list of dates
+    date_list = []
+    current_date = start_date
+    while current_date <= end_date:
+        date_list.append(current_date.strftime('%Y-%m-%d'))
+        current_date += timedelta(days=interval_days)
+    
+    return date_list
+def get_binance_ohlc_time(symbol, interval, start_str, end_str):
+    print(start_str,"->",end_str)
+    url = f'https://api.binance.com/api/v3/klines'
+    
+    # Convert start and end times to milliseconds since epoch
+    start_ts = int(datetime.strptime(start_str, '%Y-%m-%d %H:%M:%S').timestamp() * 1000)
+    end_ts = int(datetime.strptime(end_str, '%Y-%m-%d %H:%M:%S').timestamp() * 1000)
+    
+    params = {
+        'symbol': symbol,
+        'interval': interval,
+        'startTime': start_ts,
+        'endTime': end_ts
+    }
+    response = requests.get(url, params=params)
+    data = response.json()
+    ohlc = []
+    for item in data:
+        ohlc.append({
+            'timestamp': datetime.fromtimestamp(item[0] / 1000),
+            'open': float(item[1]),
+            'high': float(item[2]),
+            'low': float(item[3]),
+            'close': float(item[4]),
+            'volumn': float(item[5])
+        })
+    
+    df = pd.DataFrame(ohlc)
+    df.reset_index(drop=True, inplace=True)
+
+    # df.set_index('timestamp', inplace=True)
+    return df
 
 
 
