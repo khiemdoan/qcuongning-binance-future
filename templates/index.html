@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Upload and Crop</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        img {
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        .DroneId {
+            font-size: 48px;
+            text-align: center;
+            margin-top: 80;
+            color: #28a745;
+        }
+        .selection {
+            margin-top: 20px;
+        }
+        .selectedOption {
+            margin-top: 20px;
+        }
+        .csv {
+            margin-top: 20px;
+            text-align: center;
+            justify-content: center;
+
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body>
+    <div class="container">
+    <button id="showButton">Show CSV</button>
+    <button id="Drone IdButton">Random Num</button>
+    <button id="plot">plot</button>
+
+    <div id="DroneId" class="DroneId"></div>
+    <div class="selection">
+        <select id="optionsSelect">
+            <option value="">Select an option</option>
+            <option value="current">current</option>
+            <option value="previous">previous</option>
+            <option value="pre-previous">pre-previous</option>
+        </select>
+        <input type="text" id="newOption" placeholder="Add new option" />
+        <button id="addOptionButton">Add Option</button>
+    </div>
+    <div id="selectedOption" class="selectedOption"></div>
+    <canvas id="myChart" width="200" height="100"></canvas>  <!-- Smaller canvas -->
+    <div id="csv" class="csv"></div>
+
+
+    </div>
+
+    <script>
+        const API_URL =
+        window.location.hostname === "localhost"
+            ? "http://localhost:80/" // Development URL
+            : "http://fastapi-1625219362.ap-southeast-2.elb.amazonaws.com/"; // Production URL
+
+        fetch(API_URL, {
+        method: "GET",
+        // Các cấu hình khác
+        });
+
+        const ctx = document.getElementById('myChart').getContext('2d');
+
+        const myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [1,2,3],
+                datasets: [{
+                    label: 'Sine Wave',
+                    data: [2,3,4],
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },});
+
+        document.getElementById('Drone IdButton').onclick = async () => {
+            const response = await fetch(API_URL + 'price');
+            const data = await response.json();
+            document.getElementById('DroneId').innerText = data.price;  // Chỉ hiển thị số
+        };
+        document.getElementById('optionsSelect').addEventListener('change', async function() {
+                const selectedValue = this.value;
+                if (selectedValue) {
+                    const response = await fetch(API_URL + `select?option=${selectedValue}`);
+                    const result = await response.json();
+                    document.getElementById('selectedOption').innerText = result.message;
+                } else {
+                    document.getElementById('selectedOption').innerText = '';
+                }
+            });
+
+        document.getElementById('addOptionButton').onclick = () => {
+            const newOption = document.getElementById('newOption').value.trim();
+            if (newOption) {
+                const select = document.getElementById('optionsSelect');
+                const option = document.createElement('option');
+                option.value = newOption;
+                option.textContent = newOption;
+                select.appendChild(option);
+                document.getElementById('newOption').value = '';  // Xóa ô nhập sau khi thêm
+            }
+        };
+        document.getElementById('showButton').onclick = async() => {
+                const response = await fetch(API_URL + 'show');
+                const data = await response.json();
+
+                document.getElementById("csv").innerHTML = data.html;
+            };
+        
+    document.getElementById('plot').onclick = async() => {
+            const response = await fetch(API_URL + 'plot');
+            const datax = await response.json();
+            const time = datax.time;
+            const datak = datax.data;
+            myChart.data.labels = time;
+            myChart.data.datasets[0].data = datak;
+            myChart.update(); }
+    </script>
+</body>
+</html>

@@ -222,7 +222,9 @@ def generate_date_list(start_date_str, end_date_str, interval_days=4):
     return date_list
 def get_binance_ohlc_time(symbol, interval, start_str, end_str):
     print(start_str,"->",end_str)
-    url = f'https://api.binance.com/api/v3/klines'
+    url = f'https://fapi.binance.com/fapi/v1/klines'
+    # url = f'https://api.binance.com/api/v3/klines'
+
     
     # Convert start and end times to milliseconds since epoch
     start_ts = int(datetime.strptime(start_str, '%Y-%m-%d %H:%M:%S').timestamp() * 1000)

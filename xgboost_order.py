@@ -56,7 +56,7 @@ def process_kline(symbol, interval,kline_start_time, time_his = 31):
 
 
 def get_latest_kline_start_time(symbol, interval, limit=3):
-    klines = client_spot.klines(symbol=symbol, interval=interval, limit=limit)
+    klines = client.klines(symbol=symbol, interval=interval, limit=limit)
     kline_start_time = int(klines[-1][0])
     return datetime.fromtimestamp(kline_start_time / 1000), klines
 
@@ -147,6 +147,7 @@ def count_dict_items():
                             msg += f"*open* id: {key} at:{mean_price:.3f}, low:{dict_price[key]['low_boundary']:.2f}, high:{dict_price[key]['high_boundary']:.2f}\n"
                         elif res_query['status'] == "CANCELED":
                             dict_price[key]['filled'] = "CANCELED"
+                            dict_price[key]['break'] = True
                     except ClientError as err:
                         print(key, dict_price[key])
                         post_tele(err.error_message)
@@ -161,7 +162,8 @@ def count_dict_items():
                         dict_price[key]['highest_price'] = askPrice
                         dict_price[key]["highest_rate"]  = round(askPrice/dict_price[key]["askPrice"] *100, 1)
                     if askPrice < dict_price[key]['low_boundary'] or askPrice >= dict_price[key]['high_boundary'] or (over_time(dict_price[key]['time']) and not dict_price[key]['manual']):
-                        print(over_time(dict_price[key]['time']), "overtime")
+                        print(over_time(d
+                                        ), "overtime")
                         close_future = client.new_order(symbol=symbol, side="BUY", type="MARKET", quantity=dict_price[key]['coin'])
                         commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(close_future['orderId'], client, symbol)
                         print(Fore.GREEN + "[count_dict_items]", time.strftime("%Y-%m-%d %H:%M:%S"), f"Close order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")    
@@ -212,11 +214,12 @@ if __name__ == "__main__":
     api_key=key
     api_secret=secret
     # client = UMFutures(key="c21f1bb909318f36de0f915077deadac8322ad7df00c93606970441674c1b39b", secret="be2d7e74239b2e959b3446b880451cbb4dee2e6be9d391c4c55ae7ca0976f403", base_url="https://testnet.binancefuture.com")
-    client_spot = Spot()
+    # client_spot = Spot()
     client = UMFutures(key=api_key, secret=api_secret)
 
     bst = xgb.Booster()
-    bst.load_model('xgboost_model_ORDI_15m_15k_first_maxdepth20_3class.json')
+    print("load ./ORDIUSDT_15m_tp3_sl3_60pcent_mancond_fapiv1.json")
+    bst.load_model('./ORDIUSDT_15m_tp3_sl3_60pcent_mancond_fapiv1.json')
     cut_loss, take_profit = 1.03, 0.97
 
     last_command_time = int(time.time())
