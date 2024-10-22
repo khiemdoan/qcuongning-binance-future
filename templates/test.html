@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart.js Custom Tooltip Example</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        canvas {
+            max-width: 600px;
+            max-height: 400px;
+            margin: 20px auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="myChart"></canvas>
+
+    <script>
+        const ctx = document.getElementById('myChart').getContext('2d');
+
+        const myChart = new Chart(ctx, {
+            type: 'line', // Change to your desired chart type
+            data: {
+                labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'], // X-axis labels
+                datasets: [{
+                    label: 'Monthly Sales',
+                    data: [
+                        { sales: 65, unitsSold: 50 }, 
+                        { sales: 59, unitsSold: 40 }, 
+                        { sales: 80, unitsSold: 70 }, 
+                        { sales: 81, unitsSold: 60 }, 
+                        { sales: 56, unitsSold: 30 }, 
+                        { sales: 55, unitsSold: 20 }, 
+                        { sales: 40, unitsSold: 15 }
+                    ], // Custom data structure
+                    borderColor: 'rgba(75, 192, 192, 1)', // Line color
+                    borderWidth: 2,
+                    fill: false, // No fill under the line
+                    pointBackgroundColor: 'rgba(75, 192, 192, 1)', // Color of points
+                }]
+            },
+            options: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                // Custom tooltip title
+                                return 'Sales Data';
+                            },
+                            label: function(tooltipItem) {
+                                // Access custom properties in the data
+                                const month = tooltipItem.label;
+                                const sales = tooltipItem.raw.sales; // Access sales
+                                const unitsSold = tooltipItem.raw.unitsSold; // Access units sold
+                                return `${month}: ${sales} units (Sold: ${unitsSold})`; // Custom tooltip label
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

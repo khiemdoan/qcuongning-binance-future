@@ -16,13 +16,13 @@ from xgboost_order import inference
 
 app = FastAPI()
 # Allow CORS for frontend
-app.add_middleware (
-    CORSMiddleware,
-    allow_origins=["http://localhost:8000"],
-    allow_credentials=True,
-    allow_methods= ["*"],
-    allow_headers=["*"],
-)
+# app.add_middleware (
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:80"],
+#     allow_credentials=True,
+#     allow_methods= ["*"],
+#     allow_headers=["*"],
+# )
 
 templates = Jinja2Templates (directory="templates")
 @app.get("/", response_class=HTMLResponse)
@@ -80,29 +80,45 @@ async def check_select(option):
     else:
         pred_str = "decrease 3"
     kline_start_time = int(klines[-1][0])
-    timestring =  datetime.fromtimestamp(kline_start_time / 1000)
+    timestring =  datetime.fromtimestamp(kline_start_time / 1000 ) + timedelta(hours=7)
     o,h,l,c,v = ohlc[-1]
-    price_data = f"{info}\n{timestring} - {symbol} - open: {o}, high: {h}, low: {l}, close: {c}, volumn: {v}, pred: {pred_str}\nrsi_6 = {str_rsi}"
+    # price_data = f"{info}\n{timestring} - {symbol} - open: {o}, high: {h}, low: {l}, close: {c}, volumn: {v}, pred: {pred_str}\nrsi_6 = {str_rsi}"
+    price_data = f"{timestring} predict: {pred_str}"
+
     return {"message":price_data}
 
 @app.get("/show")
 async def show():
     df = pd.read_csv("./ORDIUSDT_2024-10.csv")
     df = df[df["manual"]==False][["time", "askPrice", "close_price", "pnl"]].iloc[-10:]
+    df[[ "askPrice", "close_price", "pnl"]] = df[[ "askPrice", "close_price", "pnl"]].astype(float).round(2)
     html_table = df.to_html(classes="dataframe", index=False)
     return {"html": html_table}
 
 @app.get("/plot")
 async def plot():
-    klines = client.klines(symbol="ORDIUSDT", interval="15m", limit=30)
-    close_list = [i[4] for i in klines]
-    time = list(range(len(close_list)))
-    response_data ={"time": time,"data": close_list}
+    klines = client.klines(symbol="ORDIUSDT", interval="15m", limit=80) #UK time
+    df = pd.read_csv("./ORDIUSDT_2024-10.csv") #UK time
+    df = df[df["manual"]==False]["time"]
+    df_ts = [datetime.strptime(df.iloc[i], "%Y-%m-%d %H:%M:%S").timestamp() for i in range(len(df))]
+    df_ts = np.array(df_ts)//100
+    klines_ts = np.array(klines)[:,0].astype("float")//100000
+    indices = np.where(np.isin(klines_ts,df_ts))[0].tolist()
+
+    open_list = [round(float(i[1]),3) for i in klines]
+    time = list(range(len(open_list)))
+    ts = [datetime.fromtimestamp(i[0]/1000 + 25200).strftime('%Y-%m-%d %H:%M:%S') for i in klines]  # add to viz in gmt +7
+    response_data ={"time": time,"data": open_list, "indices": indices, "ts": ts}
     return JSONResponse (content=response_data)
+
+@app.get("/about")
+async def about():
+    return f"model: {weights}\nby NQC"
 
 if __name__=="__main__":
     bst = xgb.Booster()
-    bst.load_model('./ORDIUSDT_15m_tp3_sl3_60pcent_mancond_fapiv1.json')
+    weights = './ORDIUSDT_15m_tp3_sl3_60pcent_mancond_fapiv1.json'
+    bst.load_model(weights)
 
     client = UMFutures()
     interval = "15m"
