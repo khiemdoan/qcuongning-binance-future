@@ -15,8 +15,12 @@ from colorama import Fore, Style
 from binance.spot import Spot
 import time
 
+
 def inference(x_array, model):
     min_vol = np.min(x_array[:,-1])
+    if min_vol == 0:
+        print("[error] min vol zero")
+        return 0
     x_array[:,-1] = x_array[:,-1]/min_vol
     min_price = np.min(x_array[:,:4])
     max_price = np.max(x_array[:,:4])
@@ -28,7 +32,23 @@ def inference(x_array, model):
     return y_pred_prob
 
 def process_kline(symbol, interval,kline_start_time, time_his = 31):
+    """     VD: kline_start_time 2024-01-01 00:15:00
+            IF: Current time : 2024-01-01 00:29:59
+                => current_kline_time = 2024-01-01 00:15:00
+                x_array = klines[-30] -> 2024-01-01 00:15:00
+
+            IF: Current time : 2024-01-01 00:30:01
+                => current_kline_time = 2024-01-01 00:30:00 > kline_start_time
+
+
+
+    
+    """
     current_kline_time, klines = get_latest_kline_start_time(symbol, interval, time_his)
+    while current_kline_time <= kline_start_time:
+        time.sleep(1)
+        current_kline_time, klines = get_latest_kline_start_time(symbol, interval, time_his)
+
 
     ohlc = []
     for item in klines:
@@ -43,14 +63,17 @@ def process_kline(symbol, interval,kline_start_time, time_his = 31):
     if current_kline_time>kline_start_time:
         x_array = ohlc[-31:-1]
         order_price = ohlc[-2][3] # close price of last klines
+        print(Fore.WHITE + f"[add_to_dict]start predict {time_his} klines before open price at {current_kline_time}")
+
 
     else:
         current_kline_time = current_kline_time + timedelta(minutes=int(interval[:-1]))
         x_array = ohlc[-30:]
         order_price = ohlc[-1][3] # close price of last klines
-    print(Fore.WHITE + f"[add_to_dict]start predict {time_his} klines before open price at {current_kline_time}")
+        print(Fore.WHITE + f"[add_to_dict]start predict {time_his} klines before close price at {current_kline_time}")
+
     
-    return x_array, order_price
+    return x_array, order_price, current_kline_time
 
 
 
@@ -73,15 +96,17 @@ def add_to_dict():
         if sleep_duration > 0:
             print(Fore.WHITE + f"[add_to_dict] {kline_start_time} Sleeping for {sleep_duration:.1f} seconds until the next kline starts...")
             time.sleep(sleep_duration)
-            x_array, order_price = process_kline(symbol, interval,kline_start_time, time_his=31)
+            x_array, order_price, current_kilne_str = process_kline(symbol, interval, kline_start_time, time_his=31)
             x_array_cp = x_array.copy()
             start = time.time()
             rsi_6 = calculate_rsi_with_ema(x_array_cp, 6)
             y_pred_prob = inference(x_array, bst)
             duration = time.time()-start
             if y_pred_prob !=0:
-                print(Fore.CYAN+"[add_to_dict] y_pred_prob=", y_pred_prob)
-                post_tele(f"add_to_dict: y pred prob = {y_pred_prob}, in {duration:.3f}s")
+                print(Fore.CYAN+"[add_to_dict] y_pred_prob=", y_pred_prob, ", price: ", order_price)
+                post_tele(f"add_to_dict: y pred prob = {y_pred_prob} with price: {order_price:.3f}, in {duration:.3f}s")
+                with open(f"data_track/{current_kilne_str}_{y_pred_prob}.npy", "wb") as f:
+                    np.save(f, x_array)
             with lock:
                 if int(y_pred_prob) == 1:
                     # if  is_decrease(x_array_cp[-1]) or is_decrease(x_array_cp[-2]) or is_pin_bar(x_array_cp[-1]):   # it nhat 1 nen do trong 2 nen truoc do
@@ -92,8 +117,12 @@ def add_to_dict():
                         quantity_ft = round((usdt)/order_price, precision_ft)
                         try:
                             # open_future = client.new_order(symbol=symbol, side="SELL", type="MARKET", quantity=quantity_ft)
-                            open_future = client.new_order(symbol=symbol, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
+                            # open_future = client.new_order(symbol=symbol, side="SELL", type="LIMIT", quantity=quantity_ft, price = askPrice, timeInForce="GTC")
+                            open_future = {"time":int(start*1000), "orderId":f"fake_{index}"}
                             dict_price = update_dict(dict_price, open_future, order_price, index, cut_loss, take_profit)
+                            dict_price[index]['filled'] = "T"
+                            dict_price[index]['coin'] = usdt/askPrice
+
                             index+=1
                         except ClientError as error:
                             print(Fore.RED + error.error_message)
@@ -127,8 +156,11 @@ def count_dict_items():
 
             msg = ""
             for key in dict_price.keys():
+                # print(key, dict_price[key]['break'])
                 if dict_price[key]['break'] == True:
                         continue
+                if "fake" in dict_price[key]['orderId']:
+                    dict_price[key]['filled'] = "T"
                 if dict_price[key]['filled'] == "F":
                     try:
                         res_query = client.query_order(symbol=symbol, orderId=dict_price[key]['orderId'], recvWindow=6000)
@@ -159,9 +191,15 @@ def count_dict_items():
                         dict_price[key]["highest_rate"]  = round(askPrice/dict_price[key]["askPrice"] *100, 1)
                     if askPrice < dict_price[key]['low_boundary'] or askPrice >= dict_price[key]['high_boundary'] or (over_time(dict_price[key]['time']) and not dict_price[key]['manual']):
                         print(over_time(dict_price[key]['time']), "overtime")
-                        close_future = client.new_order(symbol=symbol, side="BUY", type="MARKET", quantity=dict_price[key]['coin'])
-                        commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(close_future['orderId'], client, symbol)
-                        print(Fore.GREEN + "[count_dict_items]", time.strftime("%Y-%m-%d %H:%M:%S"), f"Close order {key} usdt_open: {usdt_open:.3f} coin_open: {coin_open:.3f}, mean_price: {mean_price:.3f}, commis: {commis:.3f}")    
+                        # close_future = client.new_order(symbol=symbol, side="BUY", type="MARKET", quantity=dict_price[key]['coin'])
+
+                        # commis, usdt_open, coin_open, mean_price, all_pnl = get_commision(close_future['orderId'], client, symbol)
+                        commis = 0
+                        usdt_open = usdt
+                        coin_open = dict_price[key]['coin']
+                        mean_price = askPrice
+
+                        print(Fore.GREEN + "[count_dict_items]", time.strftime("%Y-%m-%d %H:%M:%S"), f"Close order {key}, mean_price: {mean_price:.3f}, commis: {commis:.3f}, askprice: {askPrice:.3f} ")    
                         dict_price[key]['commis'] += round(commis,2)
                         dict_price[key]['close_price'] = mean_price
                         dict_price[key]['pnl'] = coin_open * (dict_price[key]["askPrice"] - mean_price) - dict_price[key]['commis']
@@ -226,7 +264,8 @@ if __name__ == "__main__":
 
 
     interval = '15m'
-    usdt = 1000
+    usdt = 700
+    print("usdt: ", usdt)
     precision_ft, precision_price = get_precision(symbol, client)
 
 

@@ -20,7 +20,6 @@ def parse_df_markdown(df):
 
 def update_dict(dict_price, order, price, index, cut_loss, take_profit, manual=False):
     if "time" in order:
-        
         time_get_gap = datetime.datetime.fromtimestamp(order['time'] / 1000).strftime("%Y-%m-%d %H:%M:%S")
     else:
         time_get_gap = datetime.datetime.fromtimestamp(order['updateTime'] / 1000).strftime("%Y-%m-%d %H:%M:%S")

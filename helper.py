@@ -46,6 +46,8 @@ def update_tele(last_command_time, enable_new_order, enable_pnl, indexz, dict_pr
     data = response.json()
     
     if "result" in data and len(data["result"]) > 0:
+        if "message" not in data["result"][-1].keys():
+            return last_command_time, enable_new_order, enable_pnl, indexz, dict_price
         cmd = data["result"][-1]["message"]["text"]
         time = data['result'][-1]['message']['date']
         if time > last_command_time:

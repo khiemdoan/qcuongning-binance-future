@@ -18,9 +18,9 @@ from xgboost_order import is_pin_bar, is_decrease
 
 
 if __name__ == "__main__":
-    client = Spot()
+    client = UMFutures()
     bst = xgb.Booster()
-    bst.load_model('xgboost_model_ORDI_15m_15k_first_maxdepth20_3class.json')
+    bst.load_model('ORDIUSDT_15m_tp3_sl3_60pcent_mancond_fapiv1.json')
 
     end_str = sys.argv[1]+" "+sys.argv[2]
     

@@ -16,13 +16,13 @@ from xgboost_order import inference
 
 app = FastAPI()
 # Allow CORS for frontend
-# app.add_middleware (
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:80"],
-#     allow_credentials=True,
-#     allow_methods= ["*"],
-#     allow_headers=["*"],
-# )
+app.add_middleware (
+    CORSMiddleware,
+    allow_origins=["http://localhost:80", "http://coinpeak.site"],
+    allow_credentials=True,
+    allow_methods= ["*"],
+    allow_headers=["*"],
+)
 
 templates = Jinja2Templates (directory="templates")
 @app.get("/", response_class=HTMLResponse)
@@ -89,16 +89,19 @@ async def check_select(option):
 
 @app.get("/show")
 async def show():
-    df = pd.read_csv("./ORDIUSDT_2024-10.csv")
+    df = pd.read_csv("./ORDIUSDT_2024-12.csv")
     df = df[df["manual"]==False][["time", "askPrice", "close_price", "pnl"]].iloc[-10:]
     df[[ "askPrice", "close_price", "pnl"]] = df[[ "askPrice", "close_price", "pnl"]].astype(float).round(2)
+    df['time'] = pd.to_datetime(df['time'])
+
+    df['time'] = df['time'] + pd.Timedelta(hours=7)
     html_table = df.to_html(classes="dataframe", index=False)
     return {"html": html_table}
 
 @app.get("/plot")
 async def plot():
     klines = client.klines(symbol="ORDIUSDT", interval="15m", limit=80) #UK time
-    df = pd.read_csv("./ORDIUSDT_2024-10.csv") #UK time
+    df = pd.read_csv("./ORDIUSDT_2024-12.csv") #UK time
     df = df[df["manual"]==False]["time"]
     df_ts = [datetime.strptime(df.iloc[i], "%Y-%m-%d %H:%M:%S").timestamp() for i in range(len(df))]
     df_ts = np.array(df_ts)//100
