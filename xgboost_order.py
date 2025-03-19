@@ -3,14 +3,14 @@ import time
 from datetime import datetime
 import pandas as pd
 import requests
-from binance_ft.um_futures import UMFutures
+# from binance_ft.um_futures import UMFutures
 from helper import get_commision, get_precision, key, secret, is_pin_bar, is_decrease, update_tele, over_time, calculate_rsi_with_ema
 from datetime import datetime, timedelta
 import numpy as np
 import xgboost as xgb
 from auto_order_manual import post_tele, update_dict, parse_df_markdown
 import threading
-from binance_ft.error import ClientError
+# from binance_ft.error import ClientError
 from colorama import Fore, Style
 from binance.spot import Spot
 import time

@@ -8,8 +8,8 @@ import sys
 import time, math
 
 import numpy as np
-import binance_ft
-from binance_ft.um_futures import UMFutures
+# import binance_ft
+# from binance_ft.um_futures import UMFutures
 import openpyxl
 import requests
 from datetime import datetime, timedelta
@@ -243,8 +243,12 @@ def get_binance_ohlc_time(symbol, interval, start_str, end_str):
         'endTime': end_ts
     }
     response = requests.get(url, params=params)
+    if response.status_code!= 200:
+        print(f"Error fetching data: {response.status_code} {response.reason}")
+        return []
     data = response.json()
     ohlc = []
+    
     for item in data:
         ohlc.append({
             'timestamp': datetime.fromtimestamp(item[0] / 1000),
@@ -262,11 +266,11 @@ def get_binance_ohlc_time(symbol, interval, start_str, end_str):
     return df
 
 def generate_df_klines(start, end, symb, interval):
-    list_day = generate_date_list(start, end, 4)
+    list_day = generate_date_list(start, end, 64)
     list_day.append(end)
     df_all = []
     for i in range(len(list_day)-1):
-        df = get_binance_ohlc_time(symb, interval, list_day[i]+" 00:15:00", list_day[i+1]+" 00:00:00")
+        df = get_binance_ohlc_time(symb, interval, list_day[i]+" 03:15:00", list_day[i+1]+" 03:00:00")
         df_all.append(df)
     df_all = pd.concat(df_all,ignore_index=True, axis=0)
     csv_file = f"data_his/{symb}_{start}_{end}_{interval}_fapiv1.csv"

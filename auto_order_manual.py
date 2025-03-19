@@ -2,11 +2,11 @@ import datetime
 import os
 import numpy as np
 import pandas as pd
-from binance_ft.um_futures import UMFutures
+# from binance_ft.um_futures import UMFutures
 import time
 import time, sys
 from helper import get_commision, get_precision, get_status_pos, key, secret, post_tele, key_test, secret_test
-from binance_ft.error import ClientError
+# from binance_ft.error import ClientError
 import requests
 import argparse
 
