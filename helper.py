@@ -224,8 +224,12 @@ def generate_date_list(start_date_str, end_date_str, interval_days=4):
     return date_list
 def get_binance_ohlc_time(symbol, interval, start_str, end_str):
     print(start_str,"->",end_str)
-    url = f'https://fapi.binance.com/fapi/v1/klines'
+    # url = f'https://fapi.binance.com/fapi/v1/klines'
     # url = f'https://api.binance.com/api/v3/klines'
+
+    url = "https://api.mexc.com/api/v3/klines"
+    print(url)
+
 
     
     # Convert start and end times to milliseconds since epoch
@@ -256,6 +260,19 @@ def get_binance_ohlc_time(symbol, interval, start_str, end_str):
 
     # df.set_index('timestamp', inplace=True)
     return df
+
+def generate_df_klines(start, end, symb, interval):
+    list_day = generate_date_list(start, end, 4)
+    list_day.append(end)
+    df_all = []
+    for i in range(len(list_day)-1):
+        df = get_binance_ohlc_time(symb, interval, list_day[i]+" 00:15:00", list_day[i+1]+" 00:00:00")
+        df_all.append(df)
+    df_all = pd.concat(df_all,ignore_index=True, axis=0)
+    csv_file = f"data_his/{symb}_{start}_{end}_{interval}_fapiv1.csv"
+    df_all.to_csv(csv_file, index=False)
+    df_all = pd.read_csv(csv_file)
+    return df_all, csv_file
 
 
 
