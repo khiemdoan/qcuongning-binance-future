@@ -42,7 +42,7 @@ def get_klines_spot(symbol, interval, limit):
     if response.status_code == 200:
         return response.json()
     else:
-        return response.text
+        return []
     
 def get_klines(symbol, interval, limit):
     """Mexc future klines"""

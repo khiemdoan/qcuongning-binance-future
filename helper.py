@@ -224,10 +224,10 @@ def generate_date_list(start_date_str, end_date_str, interval_days=4):
     return date_list
 def get_binance_ohlc_time(symbol, interval, start_str, end_str):
     print(start_str,"->",end_str)
-    # url = f'https://fapi.binance.com/fapi/v1/klines'
+    url = f'https://fapi.binance.com/fapi/v1/klines'
     # url = f'https://api.binance.com/api/v3/klines'
 
-    url = "https://api.mexc.com/api/v3/klines"
+    # url = "https://api.mexc.com/api/v3/klines"
     print(url)
 
 
@@ -265,12 +265,17 @@ def get_binance_ohlc_time(symbol, interval, start_str, end_str):
     # df.set_index('timestamp', inplace=True)
     return df
 
-def generate_df_klines(start, end, symb, interval):
-    list_day = generate_date_list(start, end, 64)
+def generate_df_klines(start, end, symb, interval, split_day=4):
+    list_day = generate_date_list(start, end, split_day)
     list_day.append(end)
     df_all = []
+    post_fix= "00"
+    # if interval == "15m":
+    #     post_fix = "00"
+    # elif interval == "4h":
+    #     post_fix = "03"
     for i in range(len(list_day)-1):
-        df = get_binance_ohlc_time(symb, interval, list_day[i]+" 03:15:00", list_day[i+1]+" 03:00:00")
+        df = get_binance_ohlc_time(symb, interval, list_day[i]+f" {post_fix}:05:00", list_day[i+1]+f" {post_fix}:03:00")
         df_all.append(df)
     df_all = pd.concat(df_all,ignore_index=True, axis=0)
     csv_file = f"data_his/{symb}_{start}_{end}_{interval}_fapiv1.csv"
