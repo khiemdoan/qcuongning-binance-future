@@ -163,7 +163,16 @@ def get_status_pos(pair, um_futures_client):
             return mean_price, pnl, coin_num
     else:
         return 0, 0, 0
-    
+
+def compute_rsi_pd(prices, period=14):
+    delta = prices.diff()
+    up = delta.clip(lower=0)
+    down = -1 * delta.clip(upper=0)
+    ema_up = up.ewm(com=period - 1, adjust=False).mean()
+    ema_down = down.ewm(com=period - 1, adjust=False).mean()
+    rs = ema_up / ema_down
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
 def calculate_rsi_with_ema(x_array, window: int = 14):
     data = x_array[:, 3]

@@ -6,7 +6,7 @@ from helper import post_tele
 import random
 
 BASE_URL = "https://api.mexc.com" 
-
+BASE_URL_FUTURE = "https://contract.mexc.com"
 def get_latest_kline_start_time(symbol, interval, limit=3):
     klines = get_klines_spot(symbol, interval, limit)
     kline_start_time = int(klines[-1][0])
@@ -44,17 +44,31 @@ def get_klines_spot(symbol, interval, limit):
     else:
         return []
     
+def get_contract_funding_rate(symbol):
+    """Fetch MEXC contract funding rate"""
+    # symbol = symbol.replace("USDT", "_USDT")
+
+    endpoint = f"/api/v1/contract/funding_rate/{symbol}"
+
+    url = BASE_URL_FUTURE + endpoint
+    params = {"symbol": symbol}
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return response.text
+    
 def get_klines(symbol, interval, limit):
     """Mexc future klines"""
-    symbol = symbol.replace("USDT", "_USDT")
+    # symbol = symbol.replace("USDT", "_USDT")
     if interval == "15m":
         interval = "Min15"
     url = f"https://contract.mexc.com/api/v1/contract/kline/{symbol}"
     params = {"symbol": symbol, "interval":interval}
     response = requests.get(url, params=params)
     if response.status_code == 200:
-        import ipdb
-        ipdb.set_trace()
+        # import ipdb
+        # ipdb.set_trace()
         return response.json()
     else:
         return response.text

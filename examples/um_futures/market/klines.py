@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import logging
+import sys
+sys.path.append(".")
 from binance_ft.um_futures import UMFutures
 from binance_ft.lib.utils import config_logging
 

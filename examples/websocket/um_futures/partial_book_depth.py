@@ -2,8 +2,8 @@
 
 import time
 import logging
-from binance_ft.lib.utils import config_logging
-from binance_ft.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
+from binance.lib.utils import config_logging
+from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 
 config_logging(logging, logging.DEBUG)
 
